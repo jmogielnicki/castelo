@@ -1,7 +1,7 @@
 // Post chain test (headless): a small scene through SceneRenderer + the whole PostFX chain (GTAO,
-// AirHaze, Underwater, TAAU, motion blur, bloom, lens flare, droplets, grading, ACES) at the real
+// AirHaze, TAAU, motion blur, bloom, lens flare, grading, ACES) at the real
 // output resolution, with stubbed modules of the other streams.
-//   node test/post-chain.mjs [mode] [out.png]     mode: air | under | motion | noao | flare | lens | waterline
+//   node test/post-chain.mjs [mode] [out.png]     mode: air | motion | noao | flare
 import { writePNG } from './headless.mjs';
 import './smaa-shim.mjs';
 import { GPU } from '../src/engine/gpu/GPU.js';
@@ -16,7 +16,7 @@ import { FullscreenPass } from '../src/engine/render/FullscreenPass.js';
 import { SceneRenderer, SCENE_FORMATS, DEPTH_FORMAT } from '../src/engine/render/SceneRenderer.js';
 import * as E from '../src/engine/index.js';
 import { PostFX } from '../src/post/PostFX.js';
-import { Underwater } from '../src/post/Underwater.js';
+import { CameraRays } from '../src/post/CameraRays.js';
 import { AirHaze } from '../src/post/AirHaze.js';
 import { Profiler } from '../src/core/Profiler.js';
 
@@ -144,11 +144,11 @@ struct BgOut { @location( 0 ) color: vec4f, @location( 1 ) velocity: vec4f, @loc
 } );
 sceneRenderer.background = realApp ? sky.background : { draw: ( rp ) => bg.draw( rp ) };
 
-const underwater = new Underwater( { depthTexture: sceneRenderer.sceneRT.depthTexture, maskTexture: sceneRenderer.waterMaskTexture, query, caustics } );
-const haze = new AirHaze( { depthTexture: sceneRenderer.sceneRT.depthTexture, underwater, atmosphere, sky, clouds } );
+const underwater = new CameraRays();
+const haze = new AirHaze( { depthTexture: sceneRenderer.sceneRT.depthTexture, rays: underwater, atmosphere, sky, clouds } );
 const engine = { width: W, height: H };
 const sunDirU = realApp ? atmosphere.sunDir : { value: G.sunDir.value.clone() };
-const post = new PostFX( engine, { sceneRenderer, camera, underwater, clouds, sunDir: sunDirU, haze } );
+const post = new PostFX( engine, { sceneRenderer, camera, rays: underwater, clouds, sunDir: sunDirU, haze } );
 // AA=none|taa|smaataa|smaa|fxaa: the anti-aliasing mode (SMAA's lookup textures are read from public/)
 if ( process.env.AA ) post.aaMode = process.env.AA;
 post.outputTexture = new Texture( { label: 'out', width: W, height: H, format: 'rgba8unorm', usage: [ 'render', 'copySrc', 'sample' ] } );
@@ -184,8 +184,6 @@ for ( let f = 0; f < FRAMES; f ++ ) {
 	else camera.lookAt( 0, 1.2, 0 );
 	mover.position.set( 9, 1.5, - 3 + ( f % 60 ) * 0.25 );
 	G.cameraUnderwater.value = mode === 'under' ? 1 : 0;
-	if ( mode === 'lens' ) { post.lens._wasUnder = f === 2; }
-	post.lens.update( dt, false );
 	if ( post.flare ) {
 
 		if ( ! realApp ) sunDirU.value.copy( G.sunDir.value );

@@ -19,6 +19,7 @@ export const VIEWS = {
 	gateOut: { p: [ - 68, 1.7, 262 ], agl: true, yaw: 0.25, pitch: 0.05, time: 16.5 },
 	night: { p: [ - 40.5, 1.65, 120 ], agl: true, yaw: - 0.05, pitch: 0.05, time: 19.6 },
 	nightWall: { p: [ - 66, 1.65, - 60 ], agl: true, yaw: - 1.2, pitch: - 0.15, time: 18.6 },
+	keyart: { p: [ - 86, 1.65, 30 ], agl: true, yaw: 1.95, pitch: 0.03, time: 17.42 },
 	noon: { p: [ - 380, 230, 520 ], yaw: - 0.62, pitch: - 0.38, time: 12.5 },
 };
 

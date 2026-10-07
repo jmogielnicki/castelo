@@ -417,7 +417,7 @@ export class Walls {
 		}
 
 		const chosen = [];
-		const SPACING = 110;
+		const SPACING = 80;
 		// prefer the gates (stairs by them in the real town), then the lowest rises
 		const near = ( i ) => T.gates.some( ( g ) => Math.hypot( S[ i ].x - g.x, S[ i ].z - g.z ) < 25 );
 		cands.sort( ( a, b ) => ( near( b.i ) - near( a.i ) ) || ( a.rise - b.rise ) );
@@ -449,7 +449,7 @@ export class Walls {
 		const T = this.terrain, kit = this.kit;
 		const S = this.curtain.samples;
 		const p = S[ i ];
-		const width = 1.2, run = 0.32;
+		const width = 1.5, run = 0.32;
 		const off = W / 2 + width / 2 + 0.02; // centre line, inside the inner face
 		// walk down the wall until the ground meets the tread height
 		const steps = [];
@@ -464,6 +464,8 @@ export class Walls {
 			const a = S[ k0 ], b = S[ k0 + 1 ];
 			if ( ! a || ! b || a.gate || b.gate ) return null;
 			const q = { x: a.x + ( b.x - a.x ) * t, z: a.z + ( b.z - a.z ) * t, nx: a.nx, nz: a.nz, tx: a.tx, tz: a.tz };
+			// only along straight-ish stretches (on a bend the wall's pieces crowd the flight)
+			if ( a.tx * p.tx + a.tz * p.tz < Math.cos( 0.3 ) ) return null;
 			const cx = q.x - q.nx * off, cz = q.z - q.nz * off;
 			const g = T.heightAt( cx, cz );
 			if ( y - g < 0.12 ) break;
@@ -511,7 +513,7 @@ export class Walls {
 
 		}
 
-		this.stairs.push( { x: steps[ 0 ].x, z: steps[ 0 ].z, top: steps[ 0 ].y, bottom: steps[ steps.length - 1 ], n: steps.length } );
+		this.stairs.push( { x: steps[ 0 ].x, z: steps[ 0 ].z, top: steps[ 0 ].y, bottom: steps[ steps.length - 1 ], n: steps.length, steps: steps.map( ( st ) => ( { x: st.x, z: st.z, y: st.y } ) ) } );
 		return steps;
 
 	}
