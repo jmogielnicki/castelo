@@ -36,8 +36,8 @@ The town is built from real data:
 - **Trees**: cypresses, olives, umbrella pines and garden trees. The fields of the Várzea are a
   procedural patchwork of stubble, ploughed earth, olive groves, vineyards and green plots.
 - **Sound** is synthesised in the browser, with no sound files. The breeze gusts on the walls and is quieter in
-  the narrow streets. Sparrows, blackbirds, collared doves and a distant gull call by day, with a dawn chorus,
-  and swifts sweep past in summer. Crickets and owls sing at night. Footsteps sound different on stone,
+  the narrow streets. Sparrows, blackbirds and a distant gull call by day, with a dawn chorus, and swifts
+  sweep past in summer. Crickets sing at night. Footsteps sound different on stone,
   cobbles, gravel, earth and grass. The Sound tab of the settings panel sets the levels.
 - **Sky and light** are kept from Tidewater: the physically based sky and atmosphere, volumetric clouds,
   aerial perspective, sun shafts, cascaded shadows, GTAO, temporal upscaling, bloom and auto exposure. The

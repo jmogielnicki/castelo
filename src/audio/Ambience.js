@@ -1,14 +1,14 @@
 // Ambient sound, all synthesised with Web Audio (no sound files): the breeze, the birds of the town and
-// the Várzea, crickets and owls at night, and the walker's footsteps.
+// the Várzea, crickets at night, and the walker's footsteps.
 //
 //   - Wind: looped pink noise through a few filters whose levels and cut-offs follow a slowly gusting
 //     wind. It is louder and brighter where you are exposed (on the walls, outside the town, up in the free
 //     camera) than in the sheltered streets. A narrow resonant band whistles through the crenels in gusts,
 //     and a high band rustles like leaves.
 //   - Birds: short synthesised calls at random places around the listener (3D, HRTF panned): sparrows in
-//     the town, a blackbird singing from a rooftop, collared doves, a distant gull, and screaming swifts
+//     the town, a blackbird singing from a rooftop, a distant gull, and screaming swifts
 //     sweeping past in summer. How many depends on the light (a dawn chorus, a busier dusk) and the season.
-//   - Night: crickets, and now and then a scops owl (spring and summer) or a tawny owl.
+//   - Night: crickets.
 //   - Footsteps: a short burst per step, shaped by the surface: stone (walls, stairs, cobbles), gravel,
 //     earth or grass. Jumps scuff, and landings thud with the fall speed.
 //
@@ -42,7 +42,6 @@ export class Ambience {
 		this._gustTarget = 0.5;
 		this._gustNext = 0;
 		this._exposure = 0.5;
-		this._owl = null; // current owl bout
 		this._listener = { x: 0, y: 0, z: 0, fx: 0, fz: - 1 };
 
 	}
@@ -296,7 +295,7 @@ export class Ambience {
 		const morning = env.hours < 12;
 		const doy = env.day;
 		const spring = smooth( 40, 80, doy ) * ( 1 - smooth( 170, 210, doy ) ); // song season
-		const warm = smooth( 90, 140, doy ) * ( 1 - smooth( 260, 310, doy ) ); // crickets, scops owls
+		const warm = smooth( 90, 140, doy ) * ( 1 - smooth( 260, 310, doy ) ); // crickets
 
 		// ---- wind: gusts every few seconds over a slow swell
 		if ( this._t > this._gustNext ) {
@@ -331,7 +330,6 @@ export class Ambience {
 
 		// ---- night
 		this.crickets.gain.setTargetAtTime( 0.05 * night * ( 0.35 + 0.65 * warm ) * ( 0.5 + 0.5 * ex ) * ( 1 - up ), now, 1.5 );
-		this._updateOwl( dt, night, warm );
 
 		// ---- birds (calls per second)
 		const song = 0.6 + 0.8 * spring;
@@ -341,7 +339,6 @@ export class Ambience {
 		const rates = [
 			[ 'sparrow', 0.22 * day * chorus * ( 0.4 + inTown ) * ground ],
 			[ 'blackbird', 0.035 * song * ( day + 2.5 * low * day ) * ground ],
-			[ 'dove', 0.025 * day * ( 0.6 + 0.4 * spring ) * ground ],
 			[ 'gull', 0.01 * day ],
 			[ 'swifts', 0.05 * day * smooth( 105, 120, doy ) * ( 1 - smooth( 215, 225, doy ) ) * ( 1 + 2 * low ) ],
 		];
@@ -520,37 +517,6 @@ export class Ambience {
 
 	}
 
-	// collared dove: "coo-COOO-coo", twice or three times, soft and low
-	_dove() {
-
-		const t = this.ctx.currentTime + 0.02;
-		const f = rand( 480, 560 );
-		const reps = 2 + Math.floor( Math.random() * 2 );
-		const notes = [];
-		let tt = t;
-		for ( let r = 0; r < reps; r ++ ) {
-
-			notes.push( [ tt, 0.22, f * 1.02 ], [ tt + 0.3, 0.5, f * 1.08 ], [ tt + 0.95, 0.32, f * 0.94 ] );
-			tt += 1.3 + rand( 0.4, 0.8 );
-
-		}
-
-		const { g } = this._voice( this._around( rand( 15, 40 ), rand( 5, 12 ) ), tt );
-		const lp = this.ctx.createBiquadFilter();
-		lp.type = 'lowpass';
-		lp.frequency.value = 900;
-		lp.connect( g );
-		const o = this._osc( 'triangle', t, tt, lp );
-		for ( const [ s, d, fr ] of notes ) {
-
-			o.frequency.setValueAtTime( fr, s );
-			o.frequency.linearRampToValueAtTime( fr * 0.96, s + d );
-			this._env( g.gain, s, d, 0.3, 0.05 );
-
-		}
-
-	}
-
 	// yellow-legged gull, far off over the Várzea (the coast is 10 km away)
 	_gull() {
 
@@ -625,68 +591,6 @@ export class Ambience {
 				s += d + rand( 0.1, 0.5 );
 
 			}
-
-		}
-
-	}
-
-	// owls: bouts of calls from one place at night (scops in the warm months, tawny all year)
-	_updateOwl( dt, night, warm ) {
-
-		const ctx = this.ctx;
-		if ( ! this._owl ) {
-
-			if ( night > 0.8 && Math.random() < 0.012 * dt ) {
-
-				const scops = Math.random() < warm;
-				this._owl = { scops, pos: this._around( rand( 40, 140 ), rand( 5, 20 ) ), left: scops ? 6 + Math.floor( Math.random() * 14 ) : 2 + Math.floor( Math.random() * 3 ), next: 0 };
-
-			}
-
-			return;
-
-		}
-
-		const o = this._owl;
-		o.next -= dt;
-		if ( o.next > 0 ) return;
-		if ( night < 0.5 || o.left -- <= 0 ) {
-
-			this._owl = null;
-			return;
-
-		}
-
-		const t = ctx.currentTime + 0.02;
-		if ( o.scops ) {
-
-			// a single soft "tyoo" every couple of seconds
-			const { g } = this._voice( o.pos, t + 0.4, this.nightBus, 25 );
-			const osc = this._osc( 'sine', t, t + 0.4, g );
-			osc.frequency.setValueAtTime( 1260, t );
-			osc.frequency.linearRampToValueAtTime( 1180, t + 0.2 );
-			this._env( g.gain, t, 0.2, 0.3, 0.03 );
-			o.next = rand( 2.3, 2.8 );
-
-		} else {
-
-			// "hoo ... hu-hoooo"
-			const { g } = this._voice( o.pos, t + 2.4, this.nightBus, 25 );
-			const lp = ctx.createBiquadFilter();
-			lp.type = 'lowpass';
-			lp.frequency.value = 1200;
-			lp.connect( g );
-			const osc = this._osc( 'triangle', t, t + 2.4, lp );
-			const notes = [ [ t, 0.45, 640, 600 ], [ t + 1.05, 0.12, 560, 600 ], [ t + 1.3, 0.9, 640, 590 ] ];
-			for ( const [ s, d, f0, f1 ] of notes ) {
-
-				osc.frequency.setValueAtTime( f0, s );
-				osc.frequency.linearRampToValueAtTime( f1, s + d );
-				this._env( g.gain, s, d, 0.3, 0.05 );
-
-			}
-
-			o.next = rand( 8, 20 );
 
 		}
 
