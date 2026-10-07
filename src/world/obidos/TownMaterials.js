@@ -82,7 +82,7 @@ fn townVoronoi( q: vec2f ) -> vec4f {
 fn townMasonry( uvIn: vec2f, seed: f32, wear: f32, px: f32 ) -> TownSurf {
 	let n0 = townNoise( uvIn / 3.1 + seed * 7.0 );
 	let n1 = townNoise( uvIn / 0.9 + seed * 3.0 + 0.31 );
-	let cs = vec2f( 0.36, 0.22 );
+	let cs = vec2f( 0.44, 0.19 );
 	let v = townVoronoi( uvIn / cs + seed * 13.0 );
 	let h1 = townHash( v.zw + seed );
 	let h2 = townHash( v.zw * 1.7 + 4.1 );
