@@ -35,6 +35,10 @@ The town is built from real data:
   roofs of canudo tiles.
 - **Trees**: cypresses, olives, umbrella pines and garden trees. The fields of the Várzea are a
   procedural patchwork of stubble, ploughed earth, olive groves, vineyards and green plots.
+- **Sound** is synthesised in the browser, with no sound files. The breeze gusts on the walls and is quieter in
+  the narrow streets. Sparrows, blackbirds, collared doves and a distant gull call by day, with a dawn chorus,
+  and swifts sweep past in summer. Crickets and owls sing at night. Footsteps sound different on stone,
+  cobbles, gravel, earth and grass. The Sound tab of the settings panel sets the levels.
 - **Sky and light** are kept from Tidewater: the physically based sky and atmosphere, volumetric clouds,
   aerial perspective, sun shafts, cascaded shadows, GTAO, temporal upscaling, bloom and auto exposure. The
   sun follows Óbidos' latitude, the time of day and the season. At dusk the wall lanterns and some windows
@@ -55,6 +59,7 @@ on the west side faces the sunset all year.
 | F | Free camera (press again to drop to your feet where you are) |
 | T | Let the day run / pause time |
 | L | Flashlight |
+| M | Sound on / off |
 | H | Settings panel: time of day, day of the year, clouds, haze, post-processing, render scale |
 | P | Photo mode |
 | F1 or ? | All controls |

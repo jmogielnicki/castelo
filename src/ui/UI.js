@@ -2150,6 +2150,7 @@ export class UI {
 						${ row( k( 'F' ), 'Free camera<small>Press again to walk from there</small>' ) }
 						${ row( k( 'T' ), 'Let the day run / pause time' ) }
 						${ row( k( 'L' ), 'Flashlight' ) }
+						${ row( k( 'M' ), 'Sound on / off' ) }
 					</section>
 					<section>
 						<h3>Interface</h3>

@@ -36,6 +36,7 @@ import { PostFX } from './post/PostFX.js';
 import { AirHaze } from './post/AirHaze.js';
 import { FlyCamera } from './player/FlyCamera.js';
 import { Player } from './player/Player.js';
+import { Ambience } from './audio/Ambience.js';
 import { updateCameraVelocity, useStaticVelocity } from './post/CameraVelocity.js';
 
 const _up = new Vector3( 0, 1, 0 );
@@ -147,7 +148,9 @@ export class App {
 		// dust, pollen, seed fluff and gnats drifting around the camera
 		this.airMotes = new AirMotes( { terrain: this.terrainGPU, clouds: this.clouds, csm: this.csm, reversedDepth: true } );
 		scene.add( this.airMotes.mesh );
-		this.player = new Player( { camera, input: this.input, terrain: this.terrainData, colliders: this.colliders } );
+		// wind, birds and footsteps (synthesised; starts on the first click, see main.js)
+		this.audio = qs.has( 'bench' ) ? null : new Ambience();
+		this.player = new Player( { camera, input: this.input, terrain: this.terrainData, colliders: this.colliders, audio: this.audio } );
 		this.freeCam = qs.has( 'fly' );
 
 		// ---------------------------------------------------------------- post
@@ -167,6 +170,7 @@ export class App {
 
 			if ( window.__ui && window.__ui.isPointerOverUI ) return;
 			this.input.requestLock();
+			if ( this.audio ) this.audio.resume();
 
 		} );
 
@@ -315,6 +319,39 @@ export class App {
 
 	}
 
+	// how exposed the listener is to the wind: the narrow streets are sheltered, the walls and the
+	// fields outside are not; high up in the free camera it is all wind
+	updateAudio( dt ) {
+
+		const c = this.camera.position;
+		let exposure, aloft = 0;
+		if ( this.freeCam ) {
+
+			const h = c.y - this.terrainData.heightAt( c.x, c.z );
+			aloft = MathUtils.smoothstep( h, 8, 60 );
+			exposure = 1;
+
+		} else if ( this.player.onWall ) exposure = 1;
+		else {
+
+			// re-test the town polygon a few times a second
+			this._inTownT = ( this._inTownT || 0 ) - dt;
+			if ( this._inTownT <= 0 ) {
+
+				this._inTown = this.terrainData.isInsideTown( c.x, c.z );
+				this._inTownT = 0.25;
+
+			}
+
+			exposure = this._inTown ? 0.35 : 0.8;
+
+		}
+
+		const s = this.settings;
+		this.audio.update( dt, { camera: this.camera, sunY: this.atmosphere.sunDir.value.y, hours: s.timeOfDay, day: s.dayOfYear, exposure, aloft } );
+
+	}
+
 	// ---------------------------------------------------------------- loop
 
 	start() {
@@ -379,9 +416,22 @@ export class App {
 
 		}
 
+		if ( this.input.hit( 'KeyM' ) && this.audio ) {
+
+			const on = this.audio.toggleMute();
+			if ( this.ui ) {
+
+				this.ui.ui.refresh();
+				this.ui.ui.toast( on ? 'Sound on' : 'Sound off' );
+
+			}
+
+		}
+
 		if ( this.freeCam ) this.fly.update( dt );
 		else this.player.update( dt );
 		this.updateSun();
+		if ( this.audio ) this.updateAudio( dt );
 
 		this.atmosphere.update( dt, this.camera.position.y );
 		this.applyAtmosphereReadback();

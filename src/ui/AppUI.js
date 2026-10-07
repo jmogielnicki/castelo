@@ -101,6 +101,21 @@ export class AppUI {
 		post.addSlider( { label: 'Vignette', object: s, key: 'vignette', min: 0, max: 1, step: 0.01, onChange: ( v ) => { P.vignette.value = v; } } );
 		post.addSlider( { label: 'Film grain', object: s, key: 'grain', min: 0, max: 0.06, step: 0.001, onChange: ( v ) => { P.grain.value = v; } } );
 
+		// ---------------------------------------------------------------- Sound
+		if ( app.audio ) {
+
+			const A = app.audio, set = A.settings;
+			const snd = ui.addTab( 'sound', 'Sound', 'sound' );
+			const mix = snd.addFolder( 'Sound', { icon: 'volume' } );
+			const pct = ( v ) => `${ Math.round( v * 100 ) }%`;
+			mix.addToggle( { label: 'Mute (M)', object: set, key: 'muted', onChange: () => A.apply() } );
+			mix.addSlider( { label: 'Volume', object: set, key: 'volume', min: 0, max: 1, step: 0.01, format: pct, onChange: () => A.apply() } );
+			mix.addSlider( { label: 'Wind', object: set, key: 'wind', min: 0, max: 2, step: 0.01, format: pct, tooltip: 'The breeze: gusty on the walls and outside the town, quieter in the narrow streets.', onChange: () => A.apply() } );
+			mix.addSlider( { label: 'Birds', object: set, key: 'birds', min: 0, max: 2, step: 0.01, format: pct, tooltip: 'Sparrows, blackbirds, doves and the odd gull by day; swifts in summer. The dawn and dusk choruses are busier. Crickets and owls at night.', onChange: () => A.apply() } );
+			mix.addSlider( { label: 'Footsteps', object: set, key: 'steps', min: 0, max: 2, step: 0.01, format: pct, tooltip: 'Steps on stone, cobbles, gravel, earth and grass; jumps and landings.', onChange: () => A.apply() } );
+
+		}
+
 		// ---------------------------------------------------------------- Performance
 		const perf = ui.addTab( 'performance', 'Performance', 'performance' );
 		const live = perf.addFolder( 'Live', { icon: 'gauge' } );

@@ -40,7 +40,8 @@ export class Player {
 		this.camOffV = 0;
 		this._camY = null;
 		this.prompt = null;
-		this.surface = 'stone';
+		this.surface = 'stone'; // under foot, for the footsteps: stone | gravel | earth | grass
+		this.onWall = false; // standing on the wall walk, a tower or a flight of steps
 
 	}
 
@@ -54,6 +55,8 @@ export class Player {
 
 		const g = this.terrain.heightAt( x, z );
 		const c = this.colliders.groundHeightAt( x, z, maxY );
+		this._onBuilt = c > g;
+		this._aboveTerrain = c - g;
 		return c > g ? c : g;
 
 	}
@@ -130,8 +133,11 @@ export class Player {
 
 			this.velocity.y = 4.6;
 			this.grounded = false;
+			if ( this.audio ) this.audio.jump( this.surface );
 
 		}
+
+		const wasGrounded = this.grounded;
 
 		this.velocity.y -= 9.81 * dt;
 
@@ -140,9 +146,11 @@ export class Player {
 		p.addScaledVector( this.velocity, dt );
 		this.colliders.resolveCapsule( p, RADIUS, HEIGHT, STEP );
 		const g = this.groundAt( p.x, p.z, p.y + STEP + 0.05 );
+		const fall = - this.velocity.y;
 		if ( p.y <= g ) {
 
 			p.y = g;
+			if ( ! wasGrounded && fall > 2 && this.audio ) this.audio.land( this._surfaceAt( p.x, p.z ), fall );
 			if ( this.velocity.y < 0 ) this.velocity.y = 0;
 			this.grounded = true;
 
@@ -155,21 +163,44 @@ export class Player {
 
 		}
 
-		// head bob + footsteps
+		if ( this.grounded ) {
+
+			this.surface = this._surfaceAt( p.x, p.z );
+			this.onWall = this._onBuilt && this._aboveTerrain > 1.5;
+
+		}
+
+		// head bob + footsteps (about two steps a second walking, three running)
 		const moved = Math.hypot( p.x - old.x, p.z - old.z );
 		if ( this.grounded ) {
 
 			this.bob += moved * 2.4;
 			this.stepDist += moved;
-			const stride = sprint ? 0.9 : 0.62;
+			const stride = sprint ? 2.0 : THREE.MathUtils.lerp( 1.3, 0.7, this.crouch );
 			if ( this.stepDist > stride ) {
 
 				this.stepDist = 0;
-				if ( this.audio && this.audio.footstep ) this.audio.footstep( this.surface );
+				if ( this.audio ) this.audio.footstep( this.surface, { sprint, crouch: this.crouch > 0.5 } );
 
 			}
 
-		}
+		} else this.stepDist = 0.6; // the first step after landing comes sooner
+
+	}
+
+	// what is underfoot (the last groundAt decides between the built surfaces and the terrain):
+	// walls, towers and steps are stone; on the terrain the street mask gives cobbles or tracks
+	_surfaceAt( x, z ) {
+
+		if ( this._onBuilt ) return 'stone';
+		const T = this.terrain;
+		const i = T.idx ? T.idx( x, z ) : - 1;
+		if ( i < 0 ) return 'grass';
+		if ( T.path[ i ] > 200 ) return 'stone';
+		if ( T.path[ i ] > 40 ) return 'gravel';
+		if ( T.rock[ i ] > 0.5 ) return 'stone';
+		if ( T.scarp[ i ] > 0 || T.sand[ i ] > 0 ) return 'earth';
+		return 'grass';
 
 	}
 
