@@ -312,11 +312,11 @@ export class Ambience {
 		this._exposure += ( env.exposure - this._exposure ) * ( 1 - Math.exp( - dt / 0.8 ) );
 		const ex = this._exposure, up = env.aloft || 0;
 		const T = 0.25;
-		// compress the wind's range: the calmest wind (a sheltered street at night) keeps its level, the
-		// strongest gust on an exposed wall comes out at half, and everything between is scaled linearly
+		// compress the wind's range: the calmest wind (a sheltered street at night) comes out at 120%, the
+		// strongest gust on an exposed wall at 50%, and everything between is mapped linearly
 		const drive = g * ( 0.3 + 0.7 * ex + 0.6 * up );
-		const D_MIN = 0.1875 * ( 0.3 + 0.7 * 0.35 ), D_MAX = 1.1;
-		const level = drive > D_MIN ? D_MIN + ( drive - D_MIN ) * ( 0.5 * D_MAX - D_MIN ) / ( D_MAX - D_MIN ) : drive;
+		const D_MIN = 0.1875 * ( 0.3 + 0.7 * 0.35 ), D_MAX = 1.1, L_MIN = 1.2 * D_MIN, L_MAX = 0.5 * D_MAX;
+		const level = drive > D_MIN ? L_MIN + ( drive - D_MIN ) * ( L_MAX - L_MIN ) / ( D_MAX - D_MIN ) : 1.2 * drive;
 		const m = drive > 0 ? level / drive : 1;
 		this.wLow.g.gain.setTargetAtTime( m * 0.42 * drive, now, T );
 		this.wLow.f.frequency.setTargetAtTime( 180 + 260 * g * ( 0.6 + 0.4 * ex ), now, T );
