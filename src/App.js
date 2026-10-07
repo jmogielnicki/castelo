@@ -26,6 +26,7 @@ import { Colliders } from './world/Colliders.js';
 import { createTownMaterials } from './world/obidos/TownMaterials.js';
 import { Walls } from './world/obidos/Walls.js';
 import { Town } from './world/obidos/Town.js';
+import { Trees } from './world/obidos/Trees.js';
 import { installGroundBounce } from './materials/GroundBounce.js';
 import { LocalLights } from './materials/LocalLights.js';
 import { AirMotes } from './fx/AirMotes.js';
@@ -127,6 +128,12 @@ export class App {
 		await progress( 0.26, 'Whitewashing the houses…' );
 		this.town = new Town( { scene, terrain: this.terrainData, colliders: this.colliders, materials: this.townMaterials, walls: this.walls } );
 		useStaticVelocity( this.town.group );
+		if ( ! qs.has( 'noVeg' ) ) {
+
+			await progress( 0.3, 'Planting the cypresses…' );
+			this.trees = new Trees( { scene, terrain: this.terrainData, town: this.town, walls: this.walls } );
+
+		}
 
 		// sunlight bounced off the ground (one diffuse bounce, re-baked with the terrain sun shadow)
 		installGroundBounce( { terrain: this.terrainGPU, clouds: this.clouds } );
@@ -134,6 +141,7 @@ export class App {
 		if ( this.sky.background ) this.sceneRenderer.background = this.sky.background;
 		// lanterns, lit windows and the flashlight (L): nearest few packed into one small uniform array each frame
 		this.localLights = new LocalLights();
+		for ( const l of this.town.lights ) this.localLights.add( l );
 		this.terrain.mesh.material.localLightsCheap = true;
 
 		// dust, pollen, seed fluff and gnats drifting around the camera

@@ -17,6 +17,8 @@ export const VIEWS = {
 	walkN: { p: [ - 66, 1.65, - 60 ], agl: true, yaw: 0.2, pitch: - 0.12, time: 16.8 },
 	outsideWest: { p: [ - 150, 1.7, - 10 ], agl: true, yaw: - Math.PI * 0.5, pitch: 0.12, time: 16.5 },
 	gateOut: { p: [ - 68, 1.7, 262 ], agl: true, yaw: 0.25, pitch: 0.05, time: 16.5 },
+	night: { p: [ - 40.5, 1.65, 120 ], agl: true, yaw: - 0.05, pitch: 0.05, time: 19.6 },
+	nightWall: { p: [ - 66, 1.65, - 60 ], agl: true, yaw: - 1.2, pitch: - 0.15, time: 18.6 },
 	noon: { p: [ - 380, 230, 520 ], yaw: - 0.62, pitch: - 0.38, time: 12.5 },
 };
 

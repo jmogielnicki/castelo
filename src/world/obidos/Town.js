@@ -1,4 +1,4 @@
-import { Group, Mesh, Vector3 } from '../../engine/index.js';
+import { Group, Mesh, Vector3, Color } from '../../engine/index.js';
 import { MeshKit } from './MeshKit.js';
 import { OSM, pointInPolygon, polygonArea, SegmentIndex } from './Geo.js';
 import { orientedBox } from './Walls.js';
@@ -140,6 +140,8 @@ export class Town {
 		}
 
 		for ( const f of list ) this._building( f, rand );
+		this.edges = list;
+		this._lanterns( materials, rand );
 
 		for ( const [ kit, mat, name ] of [ [ this.walls, materials.plaster, 'town-walls' ], [ this.roofs, materials.roof, 'town-roofs' ] ] ) {
 
@@ -154,6 +156,99 @@ export class Town {
 		}
 
 		scene.add( this.group );
+
+	}
+
+	// Wall lanterns along the lanes (every ~22 m, on the nearest house wall, 3.3 m up), lit from
+	// dusk: a small iron lantern with glowing glass, and a light source for LocalLights.
+	_lanterns( materials, rand ) {
+
+		const T = this.terrain;
+		const kit = new MeshKit();
+		const warm = new Color( 1.0, 0.66, 0.36 );
+		const SPACING = 22;
+		const placed = [];
+		for ( const st of OSM.streets ) {
+
+			if ( ! /pedestrian|residential|living_street|steps|service|footway/.test( st.highway ) ) continue;
+			let carry = SPACING * 0.5;
+			for ( let i = 0; i + 1 < st.pts.length; i ++ ) {
+
+				const a = st.pts[ i ], b = st.pts[ i + 1 ];
+				const L = Math.hypot( b[ 0 ] - a[ 0 ], b[ 1 ] - a[ 1 ] );
+				let t = carry;
+				while ( t < L ) {
+
+					const x = a[ 0 ] + ( b[ 0 ] - a[ 0 ] ) * t / L, z = a[ 1 ] + ( b[ 1 ] - a[ 1 ] ) * t / L;
+					t += SPACING;
+					if ( Math.hypot( x, z * 0.7 ) > 520 ) continue;
+					if ( placed.some( ( p ) => Math.hypot( p[ 0 ] - x, p[ 1 ] - z ) < 12 ) ) continue;
+					const wall = this._nearestWallEdge( x, z, 5 );
+					if ( ! wall ) continue;
+					const { px, pz, nx, nz } = wall;
+					const g = T.heightAt( px + nx, pz + nz );
+					const lx = px + nx * 0.32, lz = pz + nz * 0.32, ly = g + 3.3;
+					placed.push( [ x, z ] );
+					const yaw = Math.atan2( - nz, nx );
+					// bracket, cap, glass, base
+					kit.vdata = [ 0, 0, 0, 0 ];
+					kit.box( px + nx * 0.17, ly + 0.28, pz + nz * 0.17, 0.34, 0.04, 0.04, yaw );
+					kit.box( lx, ly + 0.2, lz, 0.26, 0.05, 0.26, yaw );
+					kit.box( lx, ly - 0.2, lz, 0.2, 0.05, 0.2, yaw );
+					kit.vdata = [ 1, 0, 0, 0 ];
+					kit.box( lx, ly, lz, 0.2, 0.36, 0.2, yaw, 'top bottom' );
+					this.lights.push( { position: new Vector3( lx + nx * 0.25, ly - 0.05, lz + nz * 0.25 ), color: warm, intensity: 7, range: 13, kind: 'lantern', flicker: 0.05 } );
+
+				}
+
+				carry = t - L;
+
+			}
+
+		}
+
+		if ( kit.empty ) return;
+		const mesh = new Mesh( kit.build(), materials.lantern );
+		mesh.name = 'lanterns';
+		mesh.castShadow = false;
+		mesh.receiveShadow = true;
+		mesh.staticVelocity = true;
+		this.group.add( mesh );
+
+	}
+
+	// nearest house wall to (x, z) within r: the closest point and the wall's outward normal
+	_nearestWallEdge( x, z, r ) {
+
+		let best = null, bd = r;
+		const key = Math.floor( x / 20 ) * 73856093 ^ Math.floor( z / 20 ) * 19349663;
+		for ( const f of this.grid.get( key ) || [] ) {
+
+			const P = f.poly;
+			for ( let i = 0; i < P.length; i ++ ) {
+
+				const a = P[ i ], b = P[ ( i + 1 ) % P.length ];
+				const dx = b[ 0 ] - a[ 0 ], dz = b[ 1 ] - a[ 1 ], L2 = dx * dx + dz * dz;
+				if ( L2 < 1 ) continue;
+				const t = Math.max( 0.1, Math.min( 0.9, ( ( x - a[ 0 ] ) * dx + ( z - a[ 1 ] ) * dz ) / L2 ) );
+				const px = a[ 0 ] + dx * t, pz = a[ 1 ] + dz * t;
+				const d = Math.hypot( x - px, z - pz );
+				if ( d < bd ) {
+
+					const L = Math.sqrt( L2 );
+					// outward for the counter-clockwise footprints; must face the street point
+					const nx = dz / L, nz = - dx / L;
+					if ( ( x - px ) * nx + ( z - pz ) * nz <= 0 ) continue;
+					bd = d;
+					best = { px, pz, nx, nz };
+
+				}
+
+			}
+
+		}
+
+		return best;
 
 	}
 

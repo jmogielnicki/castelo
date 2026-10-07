@@ -49,7 +49,13 @@ struct TownSurf {
 	rough: f32,
 	hd: f32,
 	ao: f32,
+	em: vec3f,
 };
+
+// lamps and lit windows: on from dusk (the same ramp as the local lights)
+fn townNightRamp() -> f32 {
+	return smoothstep( 0.15, 0.75, frame.night );
+}
 
 fn townHash( p: vec2f ) -> f32 {
 	var q = fract( p * vec2f( 0.1031, 0.1030 ) );
@@ -103,6 +109,7 @@ fn townMasonry( uvIn: vec2f, seed: f32, wear: f32, px: f32 ) -> TownSurf {
 	col = mix( col, TC_lichenGrey, lich * 0.35 );
 	col = mix( col, TC_lichenOrange, smoothstep( 0.8, 0.9, n1.x + n0.z * 0.2 ) * 0.35 * wear );
 	var o: TownSurf;
+	o.em = vec3f( 0.0 );
 	o.albedo = col;
 	o.rough = mix( 0.88, 0.95, joint );
 	o.hd = ( smoothstep( 0.0, 0.12, v.y ) * 0.012 + n1.x * 0.008 ) * ( 1.0 - fade );
@@ -130,6 +137,7 @@ fn townPlaster( uv: vec2f, P: vec3f, d: vec4f, trim: vec3f, px: f32 ) -> TownSur
 	var hd = n1.x * 0.004;
 	var rough = 0.92;
 	var ao = 1.0;
+	var litEm = vec3f( 0.0 );
 	let aa = max( px, 0.004 ) * 1.2;
 	// painted base band (barra), ~0.7 m
 	let barH = 0.55 + fract( d.z * 13.7 ) * 0.4;
@@ -176,6 +184,9 @@ fn townPlaster( uv: vec2f, P: vec3f, d: vec4f, trim: vec3f, px: f32 ) -> TownSur
 			opening = opening * ( plank * 0.25 + 0.85 );
 		}
 		col = mix( col, opening, hole );
+		// some windows lit after dusk (warm, behind the panes; brighter low in the room)
+		let lit = select( 0.0, 1.0, ! isDoor && townHash( vec2f( bay * 7.1 + 3.0, storey + d.z * 17.0 ) ) > 0.55 );
+		litEm = vec3f( 1.0, 0.62, 0.3 ) * lit * hole * townNightRamp() * ( 1.4 - smoothstep( -1.0, 1.0, ly ) * 0.6 ) * 2.2;
 		rough = mix( rough, select( 0.15, 0.7, isDoor ), hole );
 		hd = hd + surround * 0.012 - hole * 0.08;
 		ao = mix( ao, 0.6, hole );
@@ -185,6 +196,7 @@ fn townPlaster( uv: vec2f, P: vec3f, d: vec4f, trim: vec3f, px: f32 ) -> TownSur
 		hd = hd + sill * 0.03;
 	}
 	var o: TownSurf;
+	o.em = litEm;
 	o.albedo = col;
 	o.rough = rough;
 	o.hd = hd;
@@ -213,6 +225,7 @@ fn townRoof( uv: vec2f, seed: f32, age: f32, px: f32 ) -> TownSurf {
 	let lip = smoothstep( 0.85, 1.0, fy ) * ( 1.0 - fade );
 	col = col * shade * ( 1.0 - lip * 0.35 );
 	var o: TownSurf;
+	o.em = vec3f( 0.0 );
 	o.albedo = col;
 	o.rough = 0.75;
 	o.hd = ( select( - prof * 0.02, prof * 0.05, cap ) + fy * 0.015 ) * ( 1.0 - fade );
@@ -250,6 +263,13 @@ const PX = 'let px = max( length( dpdx( in.P ) ), length( dpdy( in.P ) ) );';
 export function createTownMaterials() {
 
 	return {
+		// wall lanterns: dark iron (vdata.x = 0) and the glass (vdata.x = 1), glowing from dusk
+		lantern: make( 'TownLantern', /* wgsl */`
+	let glass = in.vs.vData.x > 0.5;
+	s.albedo = select( vec3f( 0.03, 0.03, 0.028 ), vec3f( 0.9, 0.8, 0.6 ), glass );
+	s.roughness = select( 0.5, 0.2, glass );
+	s.emissive = select( vec3f( 0.0 ), vec3f( 1.0, 0.66, 0.34 ) * townNightRamp() * 7.0, glass );
+` ),
 		stone: make( 'TownStone', /* wgsl */`
 	${ PX }
 	let t = townMasonry( in.uv, in.vs.vData.x, in.vs.vData.y, px );
@@ -265,6 +285,7 @@ export function createTownMaterials() {
 	s.roughness = t.rough;
 	s.normal = terrainPerturbNormal( in.P, in.N, t.hd, 1.0 );
 	s.ao = t.ao;
+	s.emissive = t.em;
 ` ),
 		roof: make( 'TownRoof', /* wgsl */`
 	${ PX }

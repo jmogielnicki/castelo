@@ -162,7 +162,7 @@ const TERRAIN_SURFACE = /* wgsl */`
 	// ---- town ground: dusty beaten earth and stone, weeds along the edges
 	let townW = smoothstep( 0.35, 0.75, sp.w );
 	var townCol = mix( ${ S( 0.6, 0.56, 0.48 ) }, ${ S( 0.68, 0.64, 0.56 ) }, dM.w ) * ( ( dN.y - 0.45 ) * 0.25 + 1.0 );
-	townCol = mix( townCol, ${ S( 0.35, 0.38, 0.2 ) }, smoothstep( 0.62, 0.8, dM.y + ( dN.y - 0.45 ) * 0.4 ) * 0.5 );
+	townCol = mix( townCol, ${ S( 0.35, 0.38, 0.2 ) }, smoothstep( 0.6, 0.75, dM.w + ( dN.w - 0.5 ) * 0.4 ) * 0.4 );
 	ground = mix( ground, townCol, townW );
 	hd = mix( hd, dN.z * 0.02 + dM.x * 0.03, townW );
 
