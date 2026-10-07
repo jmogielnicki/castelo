@@ -20,6 +20,7 @@ import { loadDEM } from './world/obidos/Geo.js';
 import { TerrainData } from './world/TerrainData.js';
 import { TerrainGPU } from './world/TerrainGPU.js';
 import { Terrain } from './world/Terrain.js';
+import { FarTerrain } from './world/FarTerrain.js';
 import { WORLD } from './world/WorldLayout.js';
 import { Colliders } from './world/Colliders.js';
 import { installGroundBounce } from './materials/GroundBounce.js';
@@ -111,6 +112,9 @@ export class App {
 		this.terrain = new Terrain( { scene, terrainData: this.terrainData, terrainGPU: this.terrainGPU, renderer } );
 		this.terrain.mesh.material.appliesHillShadow = true;
 		useStaticVelocity( this.terrain.mesh );
+		// the land beyond the heightmap, out to the horizon (48 km of the DEM)
+		this.farTerrain = new FarTerrain( { scene, dem: this.dem, nearHalf: WORLD.terrainSize / 2 } );
+		useStaticVelocity( this.farTerrain.mesh );
 
 		// sunlight bounced off the ground (one diffuse bounce, re-baked with the terrain sun shadow)
 		installGroundBounce( { terrain: this.terrainGPU, clouds: this.clouds } );

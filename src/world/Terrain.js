@@ -143,6 +143,7 @@ const TERRAIN_SURFACE = /* wgsl */`
 	var hd = dN.y * 0.04 + dF.y * 0.012 + dM.y * 0.05;
 
 	// ---- farmland patchwork
+	groundNdV = sat( dot( N0, normalize( frame.cameraPos - p ) ) );
 	let farmW = smoothstep( 0.25, 0.7, sp.x + ( dM.w - 0.5 ) * 0.3 );
 	if ( farmW > 0.0 ) {
 		let fm = groundFarm( xz, px, mcr );

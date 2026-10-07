@@ -18,13 +18,13 @@ import { srgb, terrainShadingModule } from './TerrainShading.js';
 //   fn groundCobbles( xz: vec2f, px: f32 ) -> vec4f                          limestone setts (albedo, a = bump)
 //   fn groundHash( p: vec2f ) -> f32
 const C = {
-	stubble: srgb( 0.74, 0.63, 0.42 ),
-	stubbleLight: srgb( 0.82, 0.72, 0.5 ),
+	stubble: srgb( 0.68, 0.58, 0.4 ),
+	stubbleLight: srgb( 0.76, 0.66, 0.47 ),
 	plough: srgb( 0.5, 0.35, 0.25 ),
 	ploughRed: srgb( 0.56, 0.32, 0.23 ),
 	ploughDark: srgb( 0.36, 0.26, 0.19 ),
-	dryGrass: srgb( 0.6, 0.55, 0.36 ),
-	dryGrassPale: srgb( 0.7, 0.64, 0.45 ),
+	dryGrass: srgb( 0.52, 0.5, 0.33 ),
+	dryGrassPale: srgb( 0.62, 0.58, 0.41 ),
 	greenPlot: srgb( 0.33, 0.4, 0.2 ),
 	greenLush: srgb( 0.25, 0.34, 0.15 ),
 	olive: srgb( 0.2, 0.24, 0.15 ),
@@ -47,6 +47,10 @@ const consts = Object.entries( C ).map( ( [ k, v ] ) => `const GC_${ k }: vec3f 
 
 const WGSL = /* wgsl */`
 ${ consts }
+
+// cosine between the surface and the view (set by the caller before groundFarm): painted crowns
+// and rows only read from above, at grazing angles they would be flat ellipses on the ground
+var<private> groundNdV: f32 = 1.0;
 
 fn groundHash( p: vec2f ) -> f32 {
 	var q = fract( p * vec2f( 0.1031, 0.1030 ) );
@@ -126,9 +130,11 @@ fn groundFarm( xz: vec2f, px: f32, macroT: f32 ) -> vec4f {
 	} else if ( id < 0.6 ) {
 		// olive grove on dry grass
 		let base = groundDryGrass( macroT, n.w, 0.0 );
-		let cov = groundCrowns( P.uv, 7.0, 2.3, px );
+		// painted crowns only where a tree is a few pixels across (close up they would read as discs on
+		// the ground: the grove's trees are meshes there)
+		let cov = groundCrowns( P.uv, 7.0, 2.3, px ) * smoothstep( 0.03, 0.12, px ) * smoothstep( 0.12, 0.35, groundNdV );
 		col = mix( base, mix( GC_olive, GC_oliveLight, n.y * 0.6 ), cov );
-		hd = cov * 0.6;
+		hd = cov * 0.15;
 	} else if ( id < 0.72 ) {
 		// vineyard rows
 		let rowP = abs( fract( P.uv.y / 2.6 ) - 0.5 ) * 2.6;

@@ -430,7 +430,7 @@ export class TerrainData {
 			sand[ k ] = Math.round( clamp( farm, 0, 1 ) * 255 );
 			gully[ k ] = Math.round( clamp( scrub * ( 1 - farmK[ k ] / 255 * 0.8 ), 0, 1 ) * 255 );
 			// bare limestone on the steepest slopes outside the walls (not under streets)
-			const r = smoothstep( 0.55, 0.95, slope + nz2.noise( x / 18, z / 18 ) * 0.25 ) * ( 1 - path[ k ] / 255 ) * ( this.inside[ k ] ? 0.3 : 1 );
+			const r = smoothstep( 0.55, 0.95, slope + nz2.noise( x / 18, z / 18 ) * 0.25 ) * ( 1 - path[ k ] / 255 ) * ( this.inside[ k ] ? 0 : 1 );
 			rock[ k ] = r;
 
 		}
