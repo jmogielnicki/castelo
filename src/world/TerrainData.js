@@ -150,31 +150,84 @@ export class TerrainData {
 
 		}
 
-		for ( let k = 0; k < res * res; k ++ ) if ( inside[ k ] ) {
+		for ( let k = 0; k < res * res; k ++ ) if ( inside[ k ] ) scarp[ k ] = 255;
 
-			scarp[ k ] = 255;
-			heights[ k ] -= 1.5;
+		// The surface model is lumpy in the town (roofs and gardens averaged in): smooth the ground
+		// inside the walls (and just round them) into the ridge's shape, a bit below the raw surface
+		const M = 40;
+		const ci0 = Math.max( 0, Math.floor( ( x0 - M - origin ) / texel ) ), ci1 = Math.min( res - 1, Math.ceil( ( x1 + M - origin ) / texel ) );
+		const cj0 = Math.max( 0, Math.floor( ( z0 - M - origin ) / texel ) ), cj1 = Math.min( res - 1, Math.ceil( ( z1 + M - origin ) / texel ) );
+		const w = ci1 - ci0 + 1, hgt = cj1 - cj0 + 1, n = Math.max( w, hgt );
+		const crop = new Float32Array( n * n ), mask = new Float32Array( n * n );
+		for ( let j = 0; j < n; j ++ ) for ( let i = 0; i < n; i ++ ) {
+
+			const gi = Math.min( ci1, ci0 + i ), gj = Math.min( cj1, cj0 + j );
+			crop[ j * n + i ] = heights[ gj * res + gi ];
+			mask[ j * n + i ] = inside[ gj * res + gi ];
+
+		}
+
+		const smooth = boxBlur2( crop, n, 9 );
+		const soft = boxBlur2( mask, n, 6 );
+		for ( let j = 0; j < hgt; j ++ ) for ( let i = 0; i < w; i ++ ) {
+
+			const k = ( cj0 + j ) * res + ci0 + i;
+			const t = Math.min( 1, soft[ j * n + i ] * 2 );
+			heights[ k ] = lerp( heights[ k ], smooth[ j * n + i ] - 1.5, t );
 
 		}
 
 	}
 
-	// Wall-walk height along the curtain (2 m samples): a few metres above the ground just inside,
-	// and at least ~8 m above the ground just outside; smoothed along the wall, with the slope kept to
-	// what flights of steps can take.
-	_wallProfile() {
+	// Gates: where streets cross the curtain (the street passes under an arch in the wall)
+	_gates() {
 
-		const line = resample( this.wallInfo.line, 2 );
-		const out = this.wallInfo.outward;
+		this.gates = this.gatesFor( this.wallInfo.line );
+
+	}
+
+	gatesFor( line ) {
+
+		const gates = [];
+		for ( const st of OSM.streets ) {
+
+			if ( ! ( st.highway in STREET_HALF ) || st.tunnel ) continue;
+			for ( let i = 0; i + 1 < st.pts.length; i ++ ) {
+
+				const hit = segIntersect( st.pts[ i ], st.pts[ i + 1 ], line );
+				if ( hit && ! gates.some( ( g ) => Math.hypot( g.x - hit[ 0 ], g.z - hit[ 1 ] ) < 12 ) ) {
+
+					const half = Math.max( 1.4, Math.min( 2.2, STREET_HALF[ st.highway ] ) );
+					gates.push( { x: hit[ 0 ], z: hit[ 1 ], y: this.heightAt( hit[ 0 ], hit[ 1 ] ), half, street: st.name || st.highway, highway: st.highway } );
+
+				}
+
+			}
+
+		}
+
+		return gates;
+
+	}
+
+	// Wall-walk height along a wall line (2 m samples): a few metres above the ground just inside, and
+	// at least ~8 m above the ground just outside; smoothed along the wall, with the slope kept to what
+	// flights of steps can take, and room for an arch over each gate. Returns { pts, length, outward }:
+	// pts [{ x, z, s, nx, nz (outward normal), dx, dz (tangent), gi, ge (ground in / out), top }].
+	profile( lineIn, outward, { gates = [], aboveIn = 3.2, aboveOut = 7.5, closed = false } = {} ) {
+
+		const line = resample( lineIn, 2 );
 		const pts = [];
 		let s = 0;
-		for ( let i = 0; i < line.length; i ++ ) {
+		const n = line.length;
+		for ( let i = 0; i < n; i ++ ) {
 
-			const a = line[ Math.max( 0, i - 1 ) ], b = line[ Math.min( line.length - 1, i + 1 ) ];
+			const ia = closed ? ( i - 1 + n ) % n : Math.max( 0, i - 1 ), ib = closed ? ( i + 1 ) % n : Math.min( n - 1, i + 1 );
+			const a = line[ ia ], b = line[ ib ];
 			let dx = b[ 0 ] - a[ 0 ], dz = b[ 1 ] - a[ 1 ];
 			const L = Math.hypot( dx, dz ) || 1;
 			dx /= L; dz /= L;
-			const nx = dz * out, nz = - dx * out; // outward normal
+			const nx = dz * outward, nz = - dx * outward; // outward normal
 			if ( i > 0 ) s += Math.hypot( line[ i ][ 0 ] - line[ i - 1 ][ 0 ], line[ i ][ 1 ] - line[ i - 1 ][ 1 ] );
 			const [ x, z ] = line[ i ];
 			let gi = - Infinity;
@@ -185,45 +238,55 @@ export class TerrainData {
 		}
 
 		// raw top, then a moving average (~16 m) and a slope limit (1 : 2.5)
-		const raw = pts.map( ( p ) => Math.max( p.gi + 3.2, p.ge + 7.5 ) );
+		const raw = pts.map( ( p ) => {
+
+			let t = Math.max( p.gi + aboveIn, p.ge + aboveOut );
+			for ( const g of gates ) {
+
+				const d = Math.hypot( g.x - p.x, g.z - p.z );
+				if ( d < 14 ) t = Math.max( t, g.y + 6.4 - Math.max( 0, d - 4 ) * 0.15 );
+
+			}
+
+			return t;
+
+		} );
+		const at = ( i ) => raw[ closed ? ( i + n ) % n : clamp( i, 0, n - 1 ) ];
 		const sm = raw.map( ( _, i ) => {
 
 			let sum = 0, w = 0;
 			for ( let k = - 4; k <= 4; k ++ ) {
 
-				const q = raw[ clamp( i + k, 0, raw.length - 1 ) ];
 				const wk = 1 - Math.abs( k ) / 5;
-				sum += q * wk; w += wk;
+				sum += at( i + k ) * wk; w += wk;
 
 			}
 
-			return sum / w;
+			return Math.max( sum / w, raw[ i ] - 0.6 );
 
 		} );
 
 		const maxRise = 2 / 2.5;
-		for ( let i = 1; i < sm.length; i ++ ) sm[ i ] = Math.min( sm[ i ], sm[ i - 1 ] + maxRise );
-		for ( let i = sm.length - 2; i >= 0; i -- ) sm[ i ] = Math.min( sm[ i ], sm[ i + 1 ] + maxRise );
+		for ( let pass = 0; pass < ( closed ? 2 : 1 ); pass ++ ) {
+
+			for ( let i = 1; i < n; i ++ ) sm[ i ] = Math.min( sm[ i ], sm[ i - 1 ] + maxRise );
+			for ( let i = n - 2; i >= 0; i -- ) sm[ i ] = Math.min( sm[ i ], sm[ i + 1 ] + maxRise );
+
+		}
+
 		pts.forEach( ( p, i ) => {
 
 			p.top = sm[ i ];
 
 		} );
-		this.wall = { pts, length: s, outward: out };
+		return { pts, length: s, outward, closed };
 
-		// gates: where streets cross the curtain
-		this.gates = [];
-		for ( const st of OSM.streets ) {
+	}
 
-			if ( ! ( st.highway in STREET_HALF ) || st.tunnel ) continue;
-			for ( let i = 0; i + 1 < st.pts.length; i ++ ) {
+	_wallProfile() {
 
-				const hit = segIntersect( st.pts[ i ], st.pts[ i + 1 ], this.wallInfo.line );
-				if ( hit && ! this.gates.some( ( g ) => Math.hypot( g.x - hit[ 0 ], g.z - hit[ 1 ] ) < 12 ) ) this.gates.push( { x: hit[ 0 ], z: hit[ 1 ], street: st.name || st.highway, highway: st.highway } );
-
-			}
-
-		}
+		this._gates();
+		this.wall = this.profile( this.wallInfo.line, this.wallInfo.outward, { gates: this.gates } );
 
 	}
 

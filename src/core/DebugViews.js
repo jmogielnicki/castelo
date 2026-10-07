@@ -5,7 +5,7 @@ import { Vector3 } from '../engine/math/index.js';
 // p[1] is metres above the ground (terrain or a wall walk) when agl is set.
 export const VIEWS = {
 	gate: { p: [ - 49.5, 1.65, 214 ], agl: true, yaw: - 0.1, pitch: - 0.02, time: 17.6 },
-	street: { p: [ - 30, 1.65, 60 ], agl: true, yaw: - 0.05, pitch: 0.02, time: 15.5 },
+	street: { p: [ - 40.5, 1.65, 120 ], agl: true, yaw: - 0.05, pitch: 0.02, time: 15.5 },
 	westWall: { p: [ - 66, 1.65, - 60 ], agl: true, yaw: Math.PI * 0.5, pitch: - 0.05, time: 16.9 },
 	westWallN: { p: [ - 64, 1.65, - 60 ], agl: true, yaw: 0.05, pitch: - 0.08, time: 16.9 },
 	castle: { p: [ - 20, 1.65, - 140 ], agl: true, yaw: - 0.3, pitch: 0.12, time: 16.5 },
@@ -14,6 +14,9 @@ export const VIEWS = {
 	plain: { p: [ - 620, 1.8, - 40 ], agl: true, yaw: - Math.PI * 0.5, pitch: 0.06, time: 17.2 },
 	sunset: { p: [ - 66, 1.65, - 60 ], agl: true, yaw: 1.75, pitch: 0.02, time: 17.5 },
 	dusk: { p: [ - 66, 1.65, - 60 ], agl: true, yaw: 1.75, pitch: 0.04, time: 17.8 },
+	walkN: { p: [ - 66, 1.65, - 60 ], agl: true, yaw: 0.2, pitch: - 0.12, time: 16.8 },
+	outsideWest: { p: [ - 150, 1.7, - 10 ], agl: true, yaw: - Math.PI * 0.5, pitch: 0.12, time: 16.5 },
+	gateOut: { p: [ - 68, 1.7, 262 ], agl: true, yaw: 0.25, pitch: 0.05, time: 16.5 },
 	noon: { p: [ - 380, 230, 520 ], yaw: - 0.62, pitch: - 0.38, time: 12.5 },
 };
 

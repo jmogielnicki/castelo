@@ -23,6 +23,9 @@ import { Terrain } from './world/Terrain.js';
 import { FarTerrain } from './world/FarTerrain.js';
 import { WORLD } from './world/WorldLayout.js';
 import { Colliders } from './world/Colliders.js';
+import { createTownMaterials } from './world/obidos/TownMaterials.js';
+import { Walls } from './world/obidos/Walls.js';
+import { Town } from './world/obidos/Town.js';
 import { installGroundBounce } from './materials/GroundBounce.js';
 import { LocalLights } from './materials/LocalLights.js';
 import { AirMotes } from './fx/AirMotes.js';
@@ -115,6 +118,15 @@ export class App {
 		// the land beyond the heightmap, out to the horizon (48 km of the DEM)
 		this.farTerrain = new FarTerrain( { scene, dem: this.dem, nearHalf: WORLD.terrainSize / 2 } );
 		useStaticVelocity( this.farTerrain.mesh );
+
+		// the walls, towers and gates (walkable wall walk, flights of steps up from the streets)
+		await progress( 0.2, 'Raising the walls…' );
+		this.townMaterials = createTownMaterials();
+		this.walls = new Walls( { scene, terrain: this.terrainData, colliders: this.colliders, materials: this.townMaterials } );
+		useStaticVelocity( this.walls.group );
+		await progress( 0.26, 'Whitewashing the houses…' );
+		this.town = new Town( { scene, terrain: this.terrainData, colliders: this.colliders, materials: this.townMaterials, walls: this.walls } );
+		useStaticVelocity( this.town.group );
 
 		// sunlight bounced off the ground (one diffuse bounce, re-baked with the terrain sun shadow)
 		installGroundBounce( { terrain: this.terrainGPU, clouds: this.clouds } );
@@ -372,7 +384,6 @@ export class App {
 		// ---- world
 		this.terrain.update( this.camera );
 		if ( this.farTerrain ) this.farTerrain.update( this.camera );
-		if ( this.town ) this.town.update( dt, this.camera );
 		this.localLights.update( this.camera, dt );
 
 		// ---- render

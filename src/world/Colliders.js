@@ -1,13 +1,19 @@
 import * as THREE from '../engine/index.js';
 
-// Lightweight collision world for the character controller and boat.
-// Boxes are oriented around Y only. Walkable boxes (decks, floors, stairs) act as ground.
+// Lightweight collision world for the character controller.
+// Boxes are oriented around Y only. Walkable boxes (wall walks, floors, stairs) act as ground.
+// Queries go through a uniform grid (CELL m): the town has thousands of boxes.
+const CELL = 8;
+const MARGIN = 1.0; // m: boxes are binned with this much slack (capsule radius, query pads)
+const EMPTY = [];
+
 export class Colliders {
 
 	constructor() {
 
 		this.boxes = [];
 		this.cylinders = [];
+		this._grid = null;
 		this._v = new THREE.Vector3();
 
 	}
@@ -23,6 +29,7 @@ export class Colliders {
 			radius: Math.hypot( half.x, half.z ),
 		};
 		this.boxes.push( b );
+		this._grid = null;
 		return b;
 
 	}
@@ -32,6 +39,35 @@ export class Colliders {
 		const c = { x, z, radius, yMin, yMax, tag };
 		this.cylinders.push( c );
 		return c;
+
+	}
+
+	_buildGrid() {
+
+		const g = this._grid = new Map();
+		for ( const b of this.boxes ) {
+
+			const r = b.radius + MARGIN;
+			const x0 = Math.floor( ( b.center.x - r ) / CELL ), x1 = Math.floor( ( b.center.x + r ) / CELL );
+			const z0 = Math.floor( ( b.center.z - r ) / CELL ), z1 = Math.floor( ( b.center.z + r ) / CELL );
+			for ( let z = z0; z <= z1; z ++ ) for ( let x = x0; x <= x1; x ++ ) {
+
+				const k = x * 73856093 ^ z * 19349663;
+				let c = g.get( k );
+				if ( ! c ) g.set( k, c = [] );
+				c.push( b );
+
+			}
+
+		}
+
+	}
+
+	// the boxes binned in the cell containing (x, z)
+	_near( x, z ) {
+
+		if ( ! this._grid ) this._buildGrid();
+		return this._grid.get( Math.floor( x / CELL ) * 73856093 ^ Math.floor( z / CELL ) * 19349663 ) || EMPTY;
 
 	}
 
@@ -52,7 +88,7 @@ export class Colliders {
 	groundHeightAt( x, z, maxY, pad = 0 ) {
 
 		let best = - Infinity;
-		for ( const b of this.boxes ) {
+		for ( const b of this._near( x, z ) ) {
 
 			if ( ! b.walkable || b.top > maxY ) continue;
 			if ( Math.abs( x - b.center.x ) > b.radius + pad + 0.01 || Math.abs( z - b.center.z ) > b.radius + pad + 0.01 ) continue;
@@ -69,7 +105,7 @@ export class Colliders {
 	resolveCapsule( pos, radius, height, stepHeight = 0.35 ) {
 
 		let hit = false;
-		for ( const b of this.boxes ) {
+		for ( const b of this._near( pos.x, pos.z ) ) {
 
 			if ( ! b.solid ) continue;
 			if ( pos.y + height < b.bottom || pos.y + stepHeight > b.top ) continue;

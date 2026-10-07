@@ -169,26 +169,40 @@ fn groundScrub( xz: vec2f, px: f32, macroT: f32, detail: f32 ) -> vec4f {
 	return vec4f( col, crowns * 1.5 );
 }
 
-// Calçada setts: irregular limestone blocks (~0.18 m) in running courses, dark joints; fades to the
-// average tone when a stone is smaller than a few pixels
-fn groundCobbles( xz: vec2f, px: f32 ) -> vec4f {
-	let s = 0.19;
-	let row = floor( xz.y / s );
-	let q = vec2f( xz.x / s + groundHash( vec2f( row, 1.0 ) ) * 3.0, xz.y / s );
+// Irregular cell pattern (jittered-grid Voronoi): x = distance to the nearest centre, y = distance
+// to the cell border (approx.), zw = the nearest cell's id. q in cell units.
+fn groundVoronoi( q: vec2f ) -> vec4f {
 	let cell = floor( q );
-	let f = fract( q ) - 0.5;
-	let h1 = groundHash( cell );
-	let h2 = groundHash( cell + 11.7 );
+	let f = fract( q );
+	var d1 = 9.0; var d2 = 9.0; var id = vec2f( 0.0 );
+	for ( var j = -1; j <= 1; j++ ) {
+		for ( var i = -1; i <= 1; i++ ) {
+			let c = cell + vec2f( f32( i ), f32( j ) );
+			let o = vec2f( groundHash( c ), groundHash( c + 17.3 ) ) * 0.8 + 0.1;
+			let d = length( vec2f( f32( i ), f32( j ) ) + o - f );
+			if ( d < d1 ) { d2 = d1; d1 = d; id = c; } else if ( d < d2 ) { d2 = d; }
+		}
+	}
+	return vec4f( d1, ( d2 - d1 ) * 0.5, id );
+}
+
+// Óbidos street paving: rounded limestone and darker basalt cobbles (~0.17 m) set in packed earth;
+// fades to the average tone when a stone is smaller than a few pixels
+fn groundCobbles( xz: vec2f, px: f32 ) -> vec4f {
+	let s = 0.17;
+	let v = groundVoronoi( xz / s + vec2f( 0.0, xz.x * 0.0 ) );
+	let h1 = groundHash( v.zw );
+	let h2 = groundHash( v.zw + 11.7 );
 	var col = mix( GC_settMid, GC_settLight, h1 );
-	col = mix( col, GC_settDark, smoothstep( 0.82, 0.95, h2 ) );
-	col = mix( col, GC_settWarm, smoothstep( 0.7, 0.9, groundHash( cell + 4.4 ) ) * 0.6 );
-	let e = max( abs( f.x ) * ( 0.9 + h2 * 0.2 ), abs( f.y ) * ( 0.95 + h1 * 0.1 ) );
+	col = mix( col, GC_settDark, smoothstep( 0.78, 0.92, h2 ) );
+	col = mix( col, GC_settWarm, smoothstep( 0.6, 0.85, groundHash( v.zw + 4.4 ) ) * 0.5 );
 	let pxS = px / s;
-	let joint = smoothstep( 0.36 - pxS, 0.46 + pxS, e );
+	let joint = 1.0 - smoothstep( 0.03, 0.09 + pxS, v.y );
 	let fade = smoothstep( 0.08, 0.3, pxS );
-	col = mix( mix( col, GC_joint, joint * 0.85 ), mix( GC_settMid, GC_joint, 0.15 ), fade );
-	let dome = ( 1.0 - e * e * 4.0 ) * 0.02;
-	return vec4f( col, mix( dome - joint * 0.012, 0.0, fade ) );
+	let jointCol = mix( GC_joint, GC_track, 0.35 );
+	col = mix( mix( col, jointCol, joint * 0.7 ), mix( GC_settMid, jointCol, 0.18 ), fade );
+	let dome = smoothstep( 0.0, 0.25, v.y ) * 0.016;
+	return vec4f( col, mix( dome - joint * 0.006, 0.0, fade ) );
 }
 `;
 
