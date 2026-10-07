@@ -3,7 +3,7 @@ import { GPU } from '../engine/gpu/GPU.js';
 import { Texture } from '../engine/gpu/Texture.js';
 import { readTexture } from '../engine/gpu/Readback.js';
 import { G } from './Globals.js';
-import { VIEWS } from './DebugViews.js';
+import { VIEWS, viewPosition } from './DebugViews.js';
 
 // Frame-time benchmark (?bench in the URL; console: `await __bench.run()`).
 //
@@ -17,7 +17,7 @@ import { VIEWS } from './DebugViews.js';
 // the side with the rod out) and 'boatHelm'.
 const MAX = 512;
 const _up = new Vector3( 0, 1, 0 );
-const DEFAULT_VIEWS = [ 'beach', 'pier', 'sunGlitter', 'village', 'underwater', 'aerial', 'palms', 'boatFish' ];
+const DEFAULT_VIEWS = [ 'gate', 'street', 'westWall', 'castle', 'aerial', 'plain' ];
 
 export class Bench {
 
@@ -151,39 +151,10 @@ export class Bench {
 	pose( name ) {
 
 		const app = this.app;
-		if ( name === 'boatFish' || name === 'boatHelm' ) {
-
-			const b = app.boatCtl, p = app.player;
-			app.setFreeCam( false );
-			b.moored = true; // held on its mooring out in open water (steady heading)
-			b.position.set( 30, 0, 150 );
-			b.mooring.anchor.copy( b.position );
-			b.quaternion.setFromAxisAngle( _up, 0.6 );
-			b.mooring.heading = 0.6;
-			b.velocity.set( 0, 0, 0 );
-			b.angular.set( 0, 0, 0 );
-			app.settings.timeOfDay = 16.2;
-			if ( name === 'boatHelm' ) {
-
-				if ( p.mode !== 'boat' ) p.enterBoat();
-
-			} else {
-
-				if ( p.mode === 'boat' ) p.leaveHelm();
-				if ( p.mode !== 'deck' ) p.boardBoat();
-				p.deckYaw = Math.PI * 0.5;
-				p.pitch = - 0.12;
-
-			}
-
-			return;
-
-		}
-
 		const v = VIEWS[ name ];
 		if ( v.time !== undefined ) app.settings.timeOfDay = v.time;
 		app.setFreeCam( true );
-		app.fly.setPose( new Vector3( ...v.p ), v.yaw, v.pitch );
+		app.fly.setPose( viewPosition( app, v ), v.yaw, v.pitch );
 		app.fly.velocity.set( 0, 0, 0 );
 
 	}
@@ -209,7 +180,7 @@ export class Bench {
 	// to `url` (a local collector, see shots())
 	async auto( tag, { url = 'http://127.0.0.1:5190/', runs = 1 } = {} ) {
 
-		const views = [ ...DEFAULT_VIEWS, 'boatHelm' ];
+		const views = [ ...DEFAULT_VIEWS ];
 		await this.shots( views, { tag, url } );
 		// per view the fastest of the runs (clock and thermal drift only ever add time)
 		let best = null;

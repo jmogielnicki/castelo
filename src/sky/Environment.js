@@ -1,7 +1,7 @@
 import { ShaderModule, UniformBlock } from '../engine/gpu/Shader.js';
 import { ComputeKernel } from '../engine/gpu/Compute.js';
 import { Texture, StorageBuffer } from '../engine/gpu/Texture.js';
-import { ComputeMips } from '../ocean/ComputeMips.js';
+import { ComputeMips } from '../engine/gpu/ComputeMips.js';
 import { SceneLighting } from '../engine/render/wgsl/lighting.js';
 import { commonModule } from '../engine/render/wgsl/common.js';
 import { Vector3 } from '../engine/math/index.js';

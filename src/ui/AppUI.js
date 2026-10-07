@@ -3,37 +3,16 @@ import { UI } from './UI.js';
 import { G } from '../core/Globals.js';
 import { GroundBounce } from '../materials/GroundBounce.js';
 
-// Binds the Tidewater UI (panel + HUD) to the running app.
-const SEA = {
-	Calm: { wind: 3.5, fetch: 40, chop: 0.75, swell: 0.28, surf: 0.18, period: 11, whitecaps: 0.2 },
-	Breezy: { wind: 7, fetch: 120, chop: 0.9, swell: 0.48, surf: 0.34, period: 9, whitecaps: 0.5 },
-	Choppy: { wind: 12, fetch: 300, chop: 1.05, swell: 0.68, surf: 0.56, period: 8.5, whitecaps: 0.75 },
-	Storm: { wind: 20, fetch: 900, chop: 1.2, swell: 1.0, surf: 0.9, period: 12, whitecaps: 1 },
-};
-
+// Binds the Castelo UI (panel + HUD) to the running app.
 export class AppUI {
 
 	constructor( app, ui = new UI() ) {
 
 		this.app = app;
 		this.ui = ui;
-		const fft = app.fft;
-		const shore = app.shore;
 
 		// ---- plain values the controls bind to; onChange pushes them into the simulation
 		const s = this.s = {
-			wind: fft.local.windSpeed,
-			windDir: fft.local.windDirection,
-			fetch: fft.local.fetch,
-			chop: fft.choppiness.value,
-			swell: fft.swell.scale,
-			whitecaps: 0.5,
-			clarity: 1,
-			surf: shore.amplitude.value,
-			period: shore.period.value,
-			gamma: shore.gamma.value,
-			curl: shore.curl.value,
-			caustics: app.caustics ? app.caustics.strength.value : 1,
 			time: app.settings.timeOfDay,
 			advance: app.settings.timeSpeed !== 0,
 			timeSpeed: app.settings.timeSpeed || 0.05,
@@ -53,109 +32,12 @@ export class AppUI {
 			shadows: true,
 		};
 
-		const spectrum = () => {
-
-			fft.local.windSpeed = s.wind;
-			fft.local.windDirection = s.windDir;
-			fft.local.fetch = s.fetch;
-			fft.swell.scale = s.swell;
-			fft.updateSpectrumUniforms();
-			const a = THREE.MathUtils.degToRad( s.windDir );
-			G.windDir.value.set( Math.cos( a ), Math.sin( a ) );
-			G.windSpeed.value = s.wind;
-
-		};
-
-		const whitecaps = () => {
-
-			// more whitecaps: foam starts at less compression (and more of it in fresh wind), lasts longer.
-			// Only crests near breaking (strong compression) foam: a laxer threshold paints every crest line
-			// with a white streak, which real open water at these wind speeds doesn't have.
-			fft.foamBias.value = 0.5 + 0.16 * s.whitecaps + 0.01 * THREE.MathUtils.clamp( s.wind - 7, - 5, 12 );
-			fft.foamDecay.value = 0.6 - 0.35 * s.whitecaps;
-
-		};
-
-		const clarity = () => {
-
-			// scale absorption/scattering around the tropical defaults
-			const k = 1 / Math.max( 0.2, s.clarity );
-			G.waterAbsorption.value.set( 0.42, 0.075, 0.035 ).multiplyScalar( 0.6 + 0.4 * k );
-			G.waterScattering.value.set( 0.012, 0.018, 0.024 ).multiplyScalar( k * k );
-
-		};
-
-		// ---------------------------------------------------------------- Ocean
-		const ocean = ui.addTab( 'ocean', 'Ocean', 'ocean' );
-		const sea = ocean.addFolder( 'Sea state', { icon: 'wind' } );
-		sea.addPresets( {
-			label: 'Conditions', active: 'Breezy',
-			presets: Object.keys( SEA ).map( ( k ) => ( {
-				label: k, icon: k.toLowerCase(),
-				apply: () => {
-
-					const p = SEA[ k ];
-					Object.assign( s, p );
-					spectrum();
-					whitecaps();
-					fft.choppiness.value = s.chop;
-					shore.amplitude.value = s.surf;
-					shore.period.value = s.period;
-
-				},
-			} ) ),
-		} );
-		sea.addSlider( { label: 'Wind speed', object: s, key: 'wind', min: 0.5, max: 30, step: 0.1, unit: 'm/s', tooltip: 'Wind 10 m above the sea. Drives the local wind waves, whitecaps and spray.', onChange: () => {
-
-			spectrum();
-			whitecaps();
-
-		} } );
-		sea.addSlider( { label: 'Wind direction', object: s, key: 'windDir', min: 0, max: 360, step: 1, unit: '°', onChange: spectrum } );
-		sea.addSlider( { label: 'Fetch', object: s, key: 'fetch', min: 5, max: 2000, log: true, unit: 'km', tooltip: 'Distance the wind has blown over open water: longer fetch, longer and higher waves.', onChange: spectrum } );
-		sea.addSlider( { label: 'Choppiness', object: s, key: 'chop', min: 0, max: 1.6, step: 0.01, tooltip: 'Horizontal displacement: sharp crests, wide troughs.', onChange: ( v ) => { fft.choppiness.value = v; } } );
-		sea.addSlider( { label: 'Ocean swell', object: s, key: 'swell', min: 0, max: 2, step: 0.01, onChange: spectrum } );
-		sea.addSlider( { label: 'Whitecaps', object: s, key: 'whitecaps', min: 0, max: 1, step: 0.01, onChange: whitecaps } );
-		const water = ocean.addFolder( 'Water', { icon: 'droplet' } );
-		water.addSlider( { label: 'Clarity', object: s, key: 'clarity', min: 0.3, max: 2, step: 0.01, tooltip: 'Lower = more suspended sediment and plankton (greener, murkier).', onChange: clarity } );
-
-		// ---------------------------------------------------------------- Shore
-		const shoreTab = ui.addTab( 'shore', 'Shore', 'shore' );
-		const surf = shoreTab.addFolder( 'Surf', { icon: 'wave' } );
-		surf.addSlider( { label: 'Wave height', object: s, key: 'surf', min: 0, max: 1.4, step: 0.01, unit: 'm', format: ( v ) => `${ ( v * 2 ).toFixed( 2 ) } m`, onChange: ( v ) => { shore.amplitude.value = v; } } );
-		surf.addSlider( { label: 'Wave period', object: s, key: 'period', min: 5, max: 16, step: 0.1, unit: 's', onChange: ( v ) => { shore.period.value = v; } } );
-		surf.addSlider( { label: 'Breaking depth ratio', object: s, key: 'gamma', min: 0.5, max: 1.1, step: 0.01, tooltip: 'Waves break when height exceeds this fraction of the depth.', onChange: ( v ) => { shore.gamma.value = v; } } );
-		surf.addSlider( { label: 'Curl', object: s, key: 'curl', min: 0, max: 1.5, step: 0.01, onChange: ( v ) => { shore.curl.value = v; } } );
-		if ( app.breakers ) {
-
-			s.spray = app.breakers.params.spray.value;
-			s.lip = app.breakers.params.sheet.value;
-			surf.addSlider( { label: 'Spray', object: s, key: 'spray', min: 0, max: 2, step: 0.01, tooltip: 'Droplets and mist thrown off breaking crests.', onChange: ( v ) => { app.breakers.params.spray.value = v; } } );
-			surf.addSlider( { label: 'Lip sheet', object: s, key: 'lip', min: 0, max: 1.5, step: 0.01, tooltip: 'The thin sheet of water thrown forward by plunging breakers.', onChange: ( v ) => { app.breakers.params.sheet.value = v; } } );
-
-		}
-
-		if ( app.wake ) {
-
-			const boat = shoreTab.addFolder( 'Boat wake', { icon: 'wave', open: false } );
-			s.wakeHeight = app.wake.amplitude.value;
-			s.wakeFoam = app.wake.foamGain.value;
-			boat.addSlider( { label: 'Wake height', object: s, key: 'wakeHeight', min: 0, max: 2, step: 0.01, onChange: ( v ) => { app.wake.amplitude.value = v; } } );
-			boat.addSlider( { label: 'Wake foam', object: s, key: 'wakeFoam', min: 0, max: 1.5, step: 0.01, onChange: ( v ) => { app.wake.foamGain.value = v; } } );
-
-		}
-		if ( app.caustics ) {
-
-			const light = shoreTab.addFolder( 'Caustics', { icon: 'sun', open: false } );
-			light.addSlider( { label: 'Intensity', object: s, key: 'caustics', min: 0, max: 2, step: 0.01, onChange: ( v ) => { app.caustics.strength.value = v; } } );
-
-		}
-
 		// ---------------------------------------------------------------- Sky
 		const sky = ui.addTab( 'sky', 'Sky', 'sky' );
 		const sun = sky.addFolder( 'Sun', { icon: 'clock' } );
 		sun.addTimeOfDay( { object: app.settings, key: 'timeOfDay' } );
-		sun.addSlider( { label: 'Sun azimuth', object: app.settings, key: 'sunAzimuth', min: - 180, max: 180, step: 1, format: ( v ) => `${ Math.round( v ) }°`, tooltip: 'Turns the sun\'s path around the island (0 = the real path: rises in the east, sets in the west).' } );
+		sun.addSlider( { label: 'Day of year', object: app.settings, key: 'dayOfYear', min: 1, max: 365, step: 1, format: dayLabel, tooltip: 'The season: the sun sets north of west in summer (over the Várzea from the west wall) and south of west in winter.' } );
+		sun.addSlider( { label: 'Sun azimuth', object: app.settings, key: 'sunAzimuth', min: - 180, max: 180, step: 1, format: ( v ) => `${ Math.round( v ) }°`, tooltip: 'Turns the sun\'s path around the town (0 = the real path at Óbidos).' } );
 		let speed = null;
 		sun.addToggle( { label: 'Advance time', object: s, key: 'advance', onChange: ( v ) => {
 
@@ -171,14 +53,14 @@ export class AppUI {
 
 			s.haze = app.haze.density.value;
 			s.shafts = app.haze.shafts.value;
-			atmo.addSlider( { label: 'Haze', object: s, key: 'haze', min: 0, max: 4, step: 0.05, tooltip: 'Aerial perspective and marine haze density (1 = about 20 km visibility at sea level, 0 = clear air).', onChange: ( v ) => { app.haze.density.value = v; } } );
-			atmo.addSlider( { label: 'Sun shafts', object: s, key: 'shafts', min: 0, max: 3, step: 0.05, tooltip: 'Volumetric light shafts and crepuscular rays in the haze (shadows of palms, the pier, hills and clouds). 0 turns them off.', onChange: ( v ) => { app.haze.shafts.value = v; } } );
+			atmo.addSlider( { label: 'Haze', object: s, key: 'haze', min: 0, max: 4, step: 0.05, tooltip: 'Aerial perspective and haze density (1 = about 20 km visibility, 0 = clear air).', onChange: ( v ) => { app.haze.density.value = v; } } );
+			atmo.addSlider( { label: 'Sun shafts', object: s, key: 'shafts', min: 0, max: 3, step: 0.05, tooltip: 'Volumetric light shafts and crepuscular rays in the haze (shadows of towers, walls, hills and clouds). 0 turns them off.', onChange: ( v ) => { app.haze.shafts.value = v; } } );
 
 		}
 		if ( app.airMotes ) {
 
 			s.air = app.airMotes.intensity.value;
-			atmo.addSlider( { label: 'Air particles', object: s, key: 'air', min: 0, max: 2, step: 0.01, tooltip: 'Dust, pollen, salt haze, seed fluff and the odd gnat drifting in the air: they catch the light when backlit by the sun. 0 turns them off.', onChange: ( v ) => { app.airMotes.intensity.value = v; } } );
+			atmo.addSlider( { label: 'Air particles', object: s, key: 'air', min: 0, max: 2, step: 0.01, tooltip: 'Dust, pollen, seed fluff and the odd gnat drifting in the air: they catch the light when backlit by the sun. 0 turns them off.', onChange: ( v ) => { app.airMotes.intensity.value = v; } } );
 
 		}
 
@@ -187,7 +69,6 @@ export class AppUI {
 		// ---------------------------------------------------------------- Camera
 		const cam = ui.addTab( 'camera', 'Camera', 'camera' );
 		const view = cam.addFolder( 'View', { icon: 'camera' } );
-		view.addSelect( { label: 'Boat camera', object: s, key: 'camMode', options: [ { label: '1st person', value: 'first' }, { label: '3rd person', value: 'third' } ], onChange: ( v ) => { app.player.camMode = v; } } );
 		view.addSlider( { label: 'Field of view', object: s, key: 'fov', min: 35, max: 100, step: 1, unit: '°', onChange: ( v ) => {
 
 			app.camera.fov = v;
@@ -202,7 +83,7 @@ export class AppUI {
 		const P = app.post.params;
 		post.addSlider( { label: 'Ambient occlusion', object: s, key: 'ao', min: 0, max: 1.5, step: 0.01, onChange: ( v ) => { P.aoStrength.value = v; } } );
 		s.bounce = GroundBounce.strength.value;
-		post.addSlider( { label: 'Bounce light', object: s, key: 'bounce', min: 0, max: 2, step: 0.01, tooltip: 'Sunlight reflected off the ground (bright sand) onto undersides and shaded faces: pier, eaves, hulls, trunks. 0 = off.', onChange: ( v ) => { GroundBounce.strength.value = v; } } );
+		post.addSlider( { label: 'Bounce light', object: s, key: 'bounce', min: 0, max: 2, step: 0.01, tooltip: 'Sunlight reflected off the ground onto undersides and shaded faces: eaves, arches, the shady side of a street. 0 = off.', onChange: ( v ) => { GroundBounce.strength.value = v; } } );
 		s.sharpen = P.sharpen.value;
 		post.addSlider( { label: 'Sharpen', object: s, key: 'sharpen', min: 0, max: 1, step: 0.01, tooltip: 'Contrast-adaptive sharpening after the temporal anti-aliasing.', onChange: ( v ) => { P.sharpen.value = v; } } );
 		if ( app.post.motionBlur ) {
@@ -238,9 +119,6 @@ export class AppUI {
 
 		} } );
 		quality.addToggle( { label: 'Shadows', object: s, key: 'shadows', onChange: ( v ) => { app.shadows.enabled = v; } } );
-		s.ssr = true;
-		quality.addToggle( { label: 'Water reflections', object: s, key: 'ssr', tooltip: 'Screen-space reflections of the pier, boats and hills on the water.', onChange: ( v ) => { app.waterMaterial.params.ssr.value = v ? 1 : 0; } } );
-
 		this._t = 0;
 
 	}
@@ -252,42 +130,30 @@ export class AppUI {
 		const ui = this.ui;
 		ui.setStats( { fps: app.fps, frameMs: dt * 1000 } );
 		this.s.renderScale = app.post.scale;
-
-		const p = app.player;
+		this.s.time = app.settings.timeOfDay;
 		if ( app.freeCam ) {
 
 			ui.setMode( 'Free camera' );
 			ui.setPrompt( 'F', 'Walk' );
-			ui.setBoatGauges( { visible: false } );
-			ui.setDepth( { visible: false } );
 			return;
 
 		}
 
-		const mode = p.mode === 'boat' ? `Boat · ${ p.camMode === 'first' ? '1st' : '3rd' } person`
-			: p.mode === 'deck' ? 'On deck'
-			: p.mode === 'swim' ? ( app.camera.position.y < ( app.cameraWaterHeight ?? 0 ) - 0.3 ? 'Diving' : 'Swimming' ) : 'Walking';
-		ui.setMode( mode );
-		if ( p.prompt ) ui.setPrompt( p.prompt.key, p.prompt.text );
+		ui.setMode( app.player.onWall ? 'On the walls' : 'Walking' );
+		if ( app.player.prompt ) ui.setPrompt( app.player.prompt.key, app.player.prompt.text );
 		else ui.setPrompt( null );
 
-		const b = app.boatCtl;
-		if ( p.mode === 'boat' ) {
-
-			const f = b.forward( new THREE.Vector3() );
-			ui.setBoatGauges( {
-				visible: true,
-				throttle: b.throttle,
-				rpm: b.rpm,
-				speedKnots: b.speed * 1.94384,
-				heading: ( THREE.MathUtils.radToDeg( Math.atan2( f.x, - f.z ) ) + 360 ) % 360,
-			} );
-
-		} else ui.setBoatGauges( { visible: false } );
-
-		const depth = ( app.cameraWaterHeight ?? 0 ) - app.camera.position.y;
-		ui.setDepth( { visible: p.mode === 'swim' && depth > 0.3, meters: depth } );
-
 	}
+
+}
+
+const MONTHS = [ 'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec' ];
+const DAYS = [ 31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31 ];
+
+function dayLabel( d ) {
+
+	let day = Math.round( d ), m = 0;
+	while ( m < 11 && day > DAYS[ m ] ) day -= DAYS[ m ++ ];
+	return `${ day } ${ MONTHS[ m ] }`;
 
 }

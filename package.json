@@ -1,13 +1,14 @@
 {
-  "name": "tidewater",
+  "name": "castelo",
   "version": "1.0.0",
   "scripts": {
     "dev": "vite --host 127.0.0.1 --port 5189",
     "build": "vite build",
     "preview": "vite preview",
-    "test": "node test/game-logic.mjs && node test/engine-smoke.mjs"
+    "test": "node test/engine-smoke.mjs"
   },
   "devDependencies": {
+    "geotiff": "^3.0.5",
     "vite": "^8.3.0",
     "webgpu": "^0.6.1"
   },

@@ -25,7 +25,7 @@ const CLR = [ 0, 0, 0, 0 ];
 // The camera under water, and pixels whose lens is in water, get nothing (Underwater handles those).
 //
 // WGSL (prefix `haze`): this.compositeModule: fn hazeApply( uv: vec2f, c: vec4f ) -> vec4f (the composite,
-// the former apply()); this.module: the helpers the passes share (hazeRay, hazeVisibility, hazePhase, ...). Consumed: underwater.module (camera ray helpers), atmosphere.module
+// the former apply()); this.module: the helpers the passes share (hazeRay, hazeVisibility, hazePhase, ...). Consumed: rays.module (CameraRays: camera ray helpers), atmosphere.module
 // `atmosphereSkyLuminance( dir ) -> vec3f`, sky.module `skyMoonSky( dir ) -> vec3f` (optional),
 // clouds.module `cloudsShadow( xz ) -> f32` + `cloudsSampleView( dir ) -> vec4f` (optional),
 // terrain.module `terrainSunShadowAt( P ) -> f32` (optional), the engine shadow module
@@ -71,10 +71,10 @@ fn sunShadowHard( P: vec3f ) -> f32 {
 
 export class AirHaze {
 
-	constructor( { depthTexture, underwater, atmosphere, sky = null, clouds = null, terrain = null, csm = null } ) {
+	constructor( { depthTexture, rays, atmosphere, sky = null, clouds = null, terrain = null, csm = null } ) {
 
 		this.depthTexture = depthTexture;
-		this.uw = underwater;
+		this.uw = rays;
 		this.atmosphere = atmosphere;
 		this.sky = sky;
 		this.clouds = clouds;
@@ -261,12 +261,12 @@ struct HazeRay { dist: f32, dir: vec3f, sky: bool, rayLen: f32 };
 fn hazeRay( uv: vec2f ) -> HazeRay {
 	let size = vec2f( textureDimensions( hazeDepth ) );
 	let d = textureLoad( hazeDepth, vec2i( clamp( uv, vec2f( 0.0 ), vec2f( 0.9999 ) ) * size ), 0 );
-	let ray = underwaterViewRay( uv );
+	let ray = camRayViewRay( uv );
 	var r: HazeRay;
 	r.rayLen = length( ray );
 	r.sky = d < 1e-7;
-	r.dist = select( min( - underwaterViewZ( max( d, 1e-9 ) ) * r.rayLen, HZ_FAR_CLAMP ), HZ_FAR_CLAMP, r.sky );
-	r.dir = normalize( ( underwaterParams.camWorld * vec4f( ray, 0.0 ) ).xyz );
+	r.dist = select( min( - camRayViewZ( max( d, 1e-9 ) ) * r.rayLen, HZ_FAR_CLAMP ), HZ_FAR_CLAMP, r.sky );
+	r.dir = normalize( ( camRayParams.camWorld * vec4f( ray, 0.0 ) ).xyz );
 	return r;
 }
 
@@ -354,7 +354,7 @@ fn hazeApply( uv: vec2f, c: vec4f ) -> vec4f {
 		if ( inAir > 0.5 ) {
 			let R = hazeRay( uv );
 			let dist = R.dist; let dir = R.dir; let sky = R.sky;
-			let camH = max( underwaterParams.camPos.y - frame.seaLevel, 0.0 );
+			let camH = max( camRayParams.camPos.y - frame.seaLevel, 0.0 );
 
 			// the haze looks like the sky just above the horizon in this direction
 			let vh = normalize( vec3f( dir.x, max( dir.y, 0.02 ), dir.z ) );
@@ -437,7 +437,7 @@ fn fragment( in: FSIn ) -> vec4f {
 	let R = hazeRay( uv );
 	var out = vec4f( 0.0, 0.0, R.dist, 1.0 );
 	if ( hazeParams.enabled > 0.5 && frame.cameraUnderwater < 0.5 && hazeParams.shafts > 0.0 ) {
-		let cam = underwaterParams.camPos;
+		let cam = camRayParams.camPos;
 		let tMax = min( R.dist, ${ f( MARCH_DIST ) } );
 		// interleaved gradient noise, decorrelated per frame (golden ratio sequence)
 		let jitter = fract( interleavedGradientNoise( in.pos.xy ) + hazeParams.frame * 0.61803398875 );
@@ -501,7 +501,7 @@ fn fragment( in: FSIn ) -> vec4f {
 	var out = vec4f( 0.0 );
 	if ( hazeParams.ssFade > 0.001 ) {
 		let uv = in.uv;
-		let dir = underwaterWorldDir( uv );
+		let dir = camRayWorldDir( uv );
 #if HZ_CLOUDS
 		let cloudT = cloudsSunTransmittance( cloudsSampleView( dir ).a );
 #else
@@ -581,7 +581,7 @@ fn fragment( in: FSIn ) -> vec4f {
 			lo = min( lo, s ); hi = max( hi, s );
 		}
 		let R = hazeRay( in.uv );
-		let world = underwaterParams.camPos + R.dir * cur.z;
+		let world = camRayParams.camPos + R.dir * cur.z;
 		let clip = frame.prevViewProjNoJitter * vec4f( world, 1.0 );
 		if ( clip.w > 1e-4 ) {
 			let puv = clip.xy / clip.w * vec2f( 0.5, -0.5 ) + 0.5;

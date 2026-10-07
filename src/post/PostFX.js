@@ -4,13 +4,11 @@ import { ComputeKernel } from '../engine/gpu/Compute.js';
 import { RenderTarget, StorageBuffer, Texture } from '../engine/gpu/Texture.js';
 import { FullscreenPass } from '../engine/render/FullscreenPass.js';
 import { FrameUniforms, G, setFrameCamera } from '../engine/render/Frame.js';
-import { LENS_REACH } from './Underwater.js';
 import { commonModule } from '../engine/render/wgsl/common.js';
 import { Matrix4, Vector2, Vector3 } from '../engine/math/index.js';
 import { GTAO } from './GTAO.js';
 import { AntiAlias } from './AntiAlias.js';
 import { TemporalUpscale } from './TemporalUpscale.js';
-import { LensDroplets } from './LensDroplets.js';
 import { LensFlare } from './LensFlare.js';
 import { MotionBlur } from './MotionBlur.js';
 
@@ -20,7 +18,7 @@ const CLR = [ 0, 0, 0, 0 ];
 
 // Post chain (internal resolution = drawing buffer * scale up to the TAAU resolve):
 //   scene (HDR + velocity) -> GTAO (half internal res, temporally rotated)
-//   -> AO composite + underwater / waterline (one pass)
+//   -> AO composite + haze (one pass)
 //   -> TAAU (anti-aliasing + upscale to the output resolution)
 //   -> bloom (13-tap downsample / tent upsample chain from half res)
 //   -> grading (saturation, contrast, warmth) + vignette + grain -> ACES (renderOutput)
@@ -58,12 +56,12 @@ fn acesFilmicToneMapping( colorIn: vec3f, exposure: f32 ) -> vec3f {
 
 export class PostFX {
 
-	constructor( renderer, { sceneRenderer, camera, underwater, clouds = null, sunDir = null, haze = null } ) {
+	constructor( renderer, { sceneRenderer, camera, rays, clouds = null, sunDir = null, haze = null } ) {
 
 		this.renderer = renderer;
 		this.camera = camera;
 		this.sceneRenderer = sceneRenderer;
-		this.underwater = underwater;
+		this.rays = rays; // CameraRays (the haze reads the camera rays)
 		this.scale = 1;
 		// headless / tests: a Texture to draw into instead of the canvas, and its size
 		this.outputTexture = null;
@@ -174,12 +172,8 @@ ${ taps }
 		this._aoBlurXPass = aoBlur( () => this.aoPass.texture, 1, 0 );
 		this._aoBlurYPass = aoBlur( () => this.aoBlurX.texture, 0, 1 );
 
-		// medium at the near clip plane per pixel (the waterline on the lens), then the composite
-		this.medium = new RenderTarget( 1, 1, { colors: [ 'r8unorm' ], label: 'medium' } );
-		underwater.mediumTexture = this.medium.texture;
 		// air: aerial perspective, marine haze and volumetric sun shafts (AirHaze) on the lit scene
 		this.haze = haze;
-		if ( haze ) haze.mediumTexture = this.medium.texture;
 		this.beauty = new RenderTarget( 1, 1, { colors: [ 'rgba16float' ], label: 'beauty' } );
 
 		// ---- temporal anti-aliasing + upscale
@@ -200,9 +194,6 @@ ${ taps }
 		// from the scene depth by a compute pass the app runs after the scene)
 		this.flare = sunDir ? new LensFlare( { depthTexture: sceneRT.depthTexture, clouds, sunDir } ) : null;
 
-		// ---- water on the lens after surfacing (screen-fixed, so after the temporal resolve)
-		this.lens = new LensDroplets();
-
 		this._outW = 0;
 		this._outH = 0;
 		this._inW = 0;
@@ -221,21 +212,13 @@ ${ taps }
 	_build() {
 
 		this._built = true;
-		const uw = this.underwater;
 		const haze = this.haze;
 
-		// the medium of each pixel's lens
-		this._mediumPass = new FullscreenPass( {
-			label: 'medium', colorFormats: [ 'r8unorm' ], modules: [ uw.module ],
-			code: 'fn fragment( in: FSIn ) -> vec4f { return vec4f( underwaterMedium( in.uv ), 0.0, 0.0, 1.0 ); }',
-		} );
-
-		// scene color with AO applied to opaque pixels that aren't behind water, then the haze, then
-		// the underwater / waterline composite
+		// scene color with AO applied to opaque pixels, then the haze
 		this._beautyPass = new FullscreenPass( {
-			label: 'beauty (AO + haze + underwater)',
+			label: 'beauty (AO + haze)',
 			colorFormats: [ 'rgba16float' ],
-			modules: [ uw.compositeModule, haze ? haze.compositeModule : null ].filter( Boolean ),
+			modules: [ commonModule, haze ? haze.compositeModule : null ].filter( Boolean ),
 			defines: haze ? haze._defines() : {},
 			bindings: {
 				post: { uniform: this.uniforms },
@@ -299,7 +282,7 @@ fn postSceneSample( uv: vec2f ) -> vec3f {
 }
 
 fn fragment( in: FSIn ) -> vec4f {
-	return underwaterComposite( in.uv, in.pos.xy );
+	return vec4f( postSceneSample( in.uv ), 1.0 );
 }
 `,
 		} );
@@ -307,7 +290,6 @@ fn fragment( in: FSIn ) -> vec4f {
 		// build the lazily built passes now (the profiler tracks them after beginFrame)
 		if ( ! this.aoPass._pass ) this.aoPass._build();
 		if ( haze && ! haze._passes ) haze._build();
-		if ( uw.renderShafts ) void uw.shaftPass;
 
 		// ---- bloom
 		this._buildBloom();
@@ -457,7 +439,7 @@ ${ reduce }
 
 	_buildFinal() {
 
-		const modules = [ commonModule, this.motionBlur.module, this.lens.module ];
+		const modules = [ commonModule, this.motionBlur.module ];
 		if ( this.flare ) modules.push( this.flare.module );
 		this._finalPass = new FullscreenPass( {
 			label: 'final (grade + tonemap)',
@@ -512,11 +494,10 @@ fn lensSharp( uv: vec2f ) -> vec3f {
 ${ this.flare ? '	c += flareLight( uv );' : '' }
 	return c;
 }
-fn lensBlurred( uv: vec2f ) -> vec3f { return textureSampleLevel( postHalf, smpLinearClamp, uv, 0.0 ).rgb + bloomAt( uv ); }
 
 fn fragment( in: FSIn ) -> vec4f {
 	let uv = in.uv;
-	var c = lensDroplets( uv ) * postExposure[ 0 ];
+	var c = lensSharp( uv ) * postExposure[ 0 ];
 	// white balance nudge + saturation + contrast around mid grey (in linear HDR)
 	c = c * vec3f( 1.0 + post.warmth, 1.0, 1.0 - post.warmth );
 	let l = luminance( c );
@@ -564,8 +545,6 @@ fn fragment( in: FSIn ) -> vec4f {
 		this.sceneRenderer.setSize( iw, ih );
 		this.beauty.setSize( iw, ih );
 		this.smaaIn.setSize( iw, ih );
-		this.medium.setSize( iw, ih );
-		if ( this.underwater.setSize ) this.underwater.setSize( iw, ih );
 		// rtt resolution scales of the original are relative to the drawing buffer (output) size
 		this.aoPass.resolutionScale = 0.5 * this.scale;
 		this.aoPass.setSize( ow, oh );
@@ -583,7 +562,6 @@ fn fragment( in: FSIn ) -> vec4f {
 		}
 
 		if ( this.flare ) this.flare.setDepthHeight( ih );
-		this.lens.aspect.value = ow / oh;
 
 	}
 
@@ -652,10 +630,6 @@ fn fragment( in: FSIn ) -> vec4f {
 		this.aoPass.render();
 		this._aoBlurXPass.render( { colorViews: [ this.aoBlurX.texture ], clear: CLR } );
 		this._aoBlurYPass.render( { colorViews: [ this.aoBlurY.texture ], clear: CLR } );
-		this._mediumPass.render( { colorViews: [ this.medium.texture ], clear: CLR } );
-		// caustic shafts / torch beam march (half res): only while the lens can be under water (the CPU
-		// water height lags the GPU's by a frame: 1 m of margin)
-		if ( this.underwater.renderShafts ) this.underwater.renderShafts( this.camera.position.y < G.cameraWaterHeight.value + LENS_REACH + 1.0 );
 		if ( this.haze ) {
 
 			this.haze.update();
@@ -698,7 +672,7 @@ fn fragment( in: FSIn ) -> vec4f {
 	passes() {
 
 		const list = [ [ 'motion blur tiles', this.motionBlur.tileKernel ], [ 'motion blur neighbours', this.motionBlur.neighborKernel ],
-			[ 'GTAO', this.aoPass._pass ], [ 'AO blur x', this._aoBlurXPass ], [ 'AO blur y', this._aoBlurYPass ], [ 'medium', this._mediumPass ] ];
+			[ 'GTAO', this.aoPass._pass ], [ 'AO blur x', this._aoBlurXPass ], [ 'AO blur y', this._aoBlurYPass ] ];
 		if ( this.haze && this.haze._passes ) {
 
 			list.push( [ 'haze march', this.haze._passes.march ], [ 'haze sun mask', this.haze._passes.mask ] );
@@ -706,7 +680,6 @@ fn fragment( in: FSIn ) -> vec4f {
 
 		}
 
-		if ( this.underwater._shaftPass ) list.push( [ 'underwater shafts', this.underwater._shaftPass ] );
 		list.push( [ 'beauty', this._beautyPass ], [ 'TAAU', this.taau._resolve[ 0 ] ], [ 'TAAU ', this.taau._resolve[ 1 ] ] );
 		this._bloomPasses.forEach( ( [ p ], i ) => list.push( [ 'bloom ' + i, p ] ) );
 		list.push( [ 'final', this._finalPass ], [ 'auto exposure', this.meterKernel ] );

@@ -1,0 +1,17 @@
+{
+	"origin": {
+		"lat": 39.3615849,
+		"lon": -9.1572126
+	},
+	"near": {
+		"n": 261,
+		"step": 10,
+		"file": "dem-near.bin"
+	},
+	"far": {
+		"n": 801,
+		"step": 60,
+		"file": "dem-far.bin"
+	},
+	"units": "int16 decimetres, row-major, row 0 = north (z = -half), column 0 = west (x = -half)"
+}

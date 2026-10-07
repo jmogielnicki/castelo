@@ -46,18 +46,19 @@ function f( x ) {
 
 // ---- palette (sRGB picked from photo references, stored linear)
 export const PALETTE = {
-	rockDark: srgb( 0.15, 0.145, 0.135 ),
-	rockMid: srgb( 0.3, 0.285, 0.265 ),
-	rockLight: srgb( 0.48, 0.455, 0.42 ),
-	rockWarm: srgb( 0.44, 0.37, 0.30 ),
-	lichenPale: srgb( 0.70, 0.70, 0.64 ),
-	lichenOrange: srgb( 0.78, 0.50, 0.20 ),
+	// Óbidos limestone: pale grey-cream, warm ochre weathering, grey and orange lichens
+	rockDark: srgb( 0.4, 0.38, 0.34 ),
+	rockMid: srgb( 0.6, 0.57, 0.5 ),
+	rockLight: srgb( 0.76, 0.73, 0.65 ),
+	rockWarm: srgb( 0.72, 0.6, 0.44 ),
+	lichenPale: srgb( 0.78, 0.78, 0.72 ),
+	lichenOrange: srgb( 0.8, 0.52, 0.22 ),
 	blackZone: srgb( 0.075, 0.075, 0.07 ),
 	barnacle: srgb( 0.78, 0.76, 0.70 ),
 	algae: srgb( 0.20, 0.27, 0.10 ),
 	coralline: srgb( 0.62, 0.44, 0.46 ),
-	moss: srgb( 0.19, 0.29, 0.08 ),
-	mossDry: srgb( 0.3, 0.34, 0.14 ),
+	moss: srgb( 0.24, 0.3, 0.12 ),
+	mossDry: srgb( 0.4, 0.4, 0.22 ),
 };
 
 // ---- tropical meadow (tall guinea / elephant grass)
