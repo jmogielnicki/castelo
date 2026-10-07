@@ -80,7 +80,7 @@ export class Ambience {
 		this.master.gain.setTargetAtTime( s.muted ? 0 : s.volume, now, 0.08 );
 		this.windBus.gain.setTargetAtTime( s.wind * 0.25, now, 0.08 );
 		this.birdBus.gain.setTargetAtTime( s.birds, now, 0.08 );
-		this.stepBus.gain.setTargetAtTime( s.steps * 0.0375, now, 0.08 );
+		this.stepBus.gain.setTargetAtTime( s.steps * 0.03, now, 0.08 );
 
 	}
 
@@ -312,16 +312,22 @@ export class Ambience {
 		this._exposure += ( env.exposure - this._exposure ) * ( 1 - Math.exp( - dt / 0.8 ) );
 		const ex = this._exposure, up = env.aloft || 0;
 		const T = 0.25;
-		this.wLow.g.gain.setTargetAtTime( 0.42 * g * ( 0.3 + 0.7 * ex + 0.6 * up ), now, T );
+		// compress the wind's range: the calmest wind (a sheltered street at night) keeps its level, the
+		// strongest gust on an exposed wall comes out at half, and everything between is scaled linearly
+		const drive = g * ( 0.3 + 0.7 * ex + 0.6 * up );
+		const D_MIN = 0.1875 * ( 0.3 + 0.7 * 0.35 ), D_MAX = 1.1;
+		const level = drive > D_MIN ? D_MIN + ( drive - D_MIN ) * ( 0.5 * D_MAX - D_MIN ) / ( D_MAX - D_MIN ) : drive;
+		const m = drive > 0 ? level / drive : 1;
+		this.wLow.g.gain.setTargetAtTime( m * 0.42 * drive, now, T );
 		this.wLow.f.frequency.setTargetAtTime( 180 + 260 * g * ( 0.6 + 0.4 * ex ), now, T );
-		this.wBody.g.gain.setTargetAtTime( 0.2 * g * g * ( 0.15 + 0.85 * ex + 0.6 * up ), now, T );
+		this.wBody.g.gain.setTargetAtTime( m * 0.2 * g * g * ( 0.15 + 0.85 * ex + 0.6 * up ), now, T );
 		this.wBody.f.frequency.setTargetAtTime( 350 + 700 * g * ( 0.5 + 0.5 * ex ), now, T );
 		const whistle = smooth( 0.65, 1.0, g ) * ex;
-		this.wWhistle.g.gain.setTargetAtTime( 0.5 * whistle, now, 0.6 );
+		this.wWhistle.g.gain.setTargetAtTime( m * 0.5 * whistle, now, 0.6 );
 		this.wWhistle.f.frequency.setTargetAtTime( 700 + 260 * g + 40 * Math.sin( this._t * 0.9 ), now, 0.4 );
 		// leaves and grass: flutters with the gusts, quieter in the streets
 		const flutter = 0.55 + 0.45 * Math.random();
-		this.wRustle.g.gain.setTargetAtTime( 0.07 * smooth( 0.2, 0.9, g ) * flutter * ( 0.35 + 0.65 * ex ) * ( 1 - up ), now, 0.09 );
+		this.wRustle.g.gain.setTargetAtTime( m * 0.07 * smooth( 0.2, 0.9, g ) * flutter * ( 0.35 + 0.65 * ex ) * ( 1 - up ), now, 0.09 );
 
 		// ---- night
 		this.crickets.gain.setTargetAtTime( 0.05 * night * ( 0.35 + 0.65 * warm ) * ( 0.5 + 0.5 * ex ) * ( 1 - up ), now, 1.5 );
