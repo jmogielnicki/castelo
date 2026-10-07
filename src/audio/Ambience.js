@@ -78,9 +78,9 @@ export class Ambience {
 		if ( ! this.ctx ) return;
 		const s = this.settings, now = this.ctx.currentTime;
 		this.master.gain.setTargetAtTime( s.muted ? 0 : s.volume, now, 0.08 );
-		this.windBus.gain.setTargetAtTime( s.wind, now, 0.08 );
+		this.windBus.gain.setTargetAtTime( s.wind * 0.25, now, 0.08 );
 		this.birdBus.gain.setTargetAtTime( s.birds, now, 0.08 );
-		this.stepBus.gain.setTargetAtTime( s.steps * 0.3, now, 0.08 );
+		this.stepBus.gain.setTargetAtTime( s.steps * 0.075, now, 0.08 );
 
 	}
 
