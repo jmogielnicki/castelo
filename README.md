@@ -35,10 +35,10 @@ The town is built from real data:
   roofs of canudo tiles.
 - **Trees**: cypresses, olives, umbrella pines and garden trees. The fields of the Várzea are a
   procedural patchwork of stubble, ploughed earth, olive groves, vineyards and green plots.
-- **Sound** is synthesised in the browser, with no sound files. The breeze gusts on the walls and is quieter in
-  the narrow streets. Sparrows, blackbirds and a distant gull call by day, with a dawn chorus, and swifts
-  sweep past in summer. Crickets sing at night. Footsteps sound different on stone,
-  cobbles, gravel, earth and grass. The Sound tab of the settings panel sets the levels.
+- **Sound** is real field recordings (CC0, from Freesound, via Tidewater). The breeze gusts on the walls and
+  is quieter in the narrow streets. Songbirds and doves sing from the roofs and trees, with a dawn chorus, and
+  crickets sing at night. Footsteps sound different on stone, loose ground and grass. The Sound tab of the
+  settings panel sets the levels.
 - **Sky and light** are kept from Tidewater: the physically based sky and atmosphere, volumetric clouds,
   aerial perspective, sun shafts, cascaded shadows, GTAO, temporal upscaling, bloom and auto exposure. The
   sun follows Óbidos' latitude, the time of day and the season. At dusk the wall lanterns and some windows
@@ -72,6 +72,7 @@ on the west side faces the sunset all year.
 | `noClouds` | Skip the volumetric clouds |
 | `noHaze` | Skip the haze and sun shafts |
 | `noVeg` | Skip the trees |
+| `noAudio` | No sound |
 | `bg` | Keep rendering when the tab is hidden (automation) |
 | `bench&shots=gate,westWall,…` | Render reference shots of the named views (`src/core/DebugViews.js`) and post them to a local collector |
 

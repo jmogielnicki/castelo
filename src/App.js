@@ -36,7 +36,7 @@ import { PostFX } from './post/PostFX.js';
 import { AirHaze } from './post/AirHaze.js';
 import { FlyCamera } from './player/FlyCamera.js';
 import { Player } from './player/Player.js';
-import { Ambience } from './audio/Ambience.js';
+import { SoundScape } from './audio/SoundScape.js';
 import { updateCameraVelocity, useStaticVelocity } from './post/CameraVelocity.js';
 
 const _up = new Vector3( 0, 1, 0 );
@@ -148,8 +148,9 @@ export class App {
 		// dust, pollen, seed fluff and gnats drifting around the camera
 		this.airMotes = new AirMotes( { terrain: this.terrainGPU, clouds: this.clouds, csm: this.csm, reversedDepth: true } );
 		scene.add( this.airMotes.mesh );
-		// wind, birds and footsteps (synthesised; starts on the first click, see main.js)
-		this.audio = qs.has( 'bench' ) ? null : new Ambience();
+		// wind, birds and footsteps: field recordings (public/audio, credits in public/audio/CREDITS.md);
+		// starts on the first click (see main.js); ?noAudio turns it off
+		this.audio = qs.has( 'bench' ) || qs.has( 'noAudio' ) ? null : new SoundScape();
 		this.player = new Player( { camera, input: this.input, terrain: this.terrainData, colliders: this.colliders, audio: this.audio } );
 		this.freeCam = qs.has( 'fly' );
 
@@ -319,36 +320,31 @@ export class App {
 
 	}
 
-	// how exposed the listener is to the wind: the narrow streets are sheltered, the walls and the
-	// fields outside are not; high up in the free camera it is all wind
+	// how exposed the listener is to the wind (the narrow streets are sheltered, the walls and the
+	// fields outside are not; high up in the free camera it is all wind) and how many trees are about
 	updateAudio( dt ) {
 
 		const c = this.camera.position;
-		let exposure, aloft = 0;
-		if ( this.freeCam ) {
+		// re-test the town polygon a few times a second
+		this._inTownT = ( this._inTownT || 0 ) - dt;
+		if ( this._inTownT <= 0 ) {
 
-			const h = c.y - this.terrainData.heightAt( c.x, c.z );
-			aloft = MathUtils.smoothstep( h, 8, 60 );
-			exposure = 1;
-
-		} else if ( this.player.onWall ) exposure = 1;
-		else {
-
-			// re-test the town polygon a few times a second
-			this._inTownT = ( this._inTownT || 0 ) - dt;
-			if ( this._inTownT <= 0 ) {
-
-				this._inTown = this.terrainData.isInsideTown( c.x, c.z );
-				this._inTownT = 0.25;
-
-			}
-
-			exposure = this._inTown ? 0.35 : 0.8;
+			this._inTown = this.terrainData.isInsideTown( c.x, c.z );
+			this._inTownT = 0.25;
 
 		}
 
-		const s = this.settings;
-		this.audio.update( dt, { camera: this.camera, sunY: this.atmosphere.sunDir.value.y, hours: s.timeOfDay, day: s.dayOfYear, exposure, aloft } );
+		const ground = this.terrainData.heightAt( c.x, c.z );
+		let exposure, aloft = 0;
+		if ( this.freeCam ) {
+
+			aloft = MathUtils.smoothstep( c.y - ground, 8, 60 );
+			exposure = 1;
+
+		} else if ( this.player.onWall ) exposure = 1;
+		else exposure = this._inTown ? 0.35 : 0.8;
+		const trees = this._inTown ? ( this.player.onWall && ! this.freeCam ? 0.6 : 0.4 ) : 1;
+		this.audio.update( dt, { camera: this.camera, sunY: this.atmosphere.sunDir.value.y, hour: this.settings.timeOfDay, exposure, trees, aloft, ground } );
 
 	}
 

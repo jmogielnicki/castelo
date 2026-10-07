@@ -1,7 +1,7 @@
 # Credits
 
 Castelo is a fork of [Tidewater](https://github.com/dgreenheck/tidewater) by DRG Software Solutions LLC.
-Its engine, sky, atmosphere, clouds, post chain, walker and free camera come from Tidewater. The code in
+Its engine, sky, atmosphere, clouds, post chain, walker, free camera and sound come from Tidewater. The code in
 this repository is released under the MIT license (see `LICENSE`). The data below keeps its own licence.
 
 ## Map data: `src/world/obidos/osm.json`
@@ -16,6 +16,16 @@ rebuilt by `tools/geodata/` (`fetch.sh`, then `node tools/geodata/build.mjs`).
 Produced using Copernicus WorldDEM-30 © DLR e.V. 2010-2014 and © Airbus Defence and Space GmbH 2014-2018,
 provided under COPERNICUS by the European Union and ESA; all rights reserved. The GLO-30 tiles are read
 from the public AWS Open Data bucket and resampled to the local frame by `tools/geodata/build.mjs`.
+
+## Audio: `public/audio/`
+
+Ten field recordings from [Freesound](https://freesound.org), all released under
+[CC0 1.0](https://creativecommons.org/publicdomain/zero/1.0/), taken with their processing from Tidewater. No
+attribution is required, but every file is credited with its author and source link in
+[`public/audio/CREDITS.md`](public/audio/CREDITS.md).
+
+Recordists: bruno.auzet, felix.blume, hdfreema, 200221-WeanBekker, SilentStrikeZ, SecureSubset, squashy555,
+Soojay, coalcon, dubminister, nathankwright and SorenF109.
 
 ## Fonts
 
