@@ -85,8 +85,8 @@ npm test         # walks the town and the walls headlessly, then an engine smoke
 npm run build    # static build in dist/
 ```
 
-`.github/workflows/deploy.yml` builds and deploys to GitHub Pages. Its trigger is manual for now. Enable
-Pages (Settings → Pages → Source: GitHub Actions) and run it from the Actions tab.
+`.github/workflows/deploy.yml` builds and deploys to GitHub Pages on every push to `main`, and can also be
+run by hand from the Actions tab.
 
 ### Rebuilding the geodata
 
